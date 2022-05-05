@@ -36,7 +36,7 @@ impl GlobalMem {
         reallocate: bool,
     ) -> io::Result<NonNull<[u8]>> {
         let old_capacity = self.base.allocated();
-        self.base.alloc(old_capacity)?;
+        self.base.alloc(new_capacity)?;
 
         if !reallocate {
             let layout = Self::layout_impl(new_capacity)?;

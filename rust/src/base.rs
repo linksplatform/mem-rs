@@ -58,7 +58,7 @@ impl RawMem for Base {
             Err(Error::new(
                 ErrorKind::Other,
                 format!(
-                    "cannot occupy ({}) greater than the memory allocated ({})",
+                    "cannot occupy {} - allocated only {} bytes",
                     capacity, self.allocated
                 ),
             ))
