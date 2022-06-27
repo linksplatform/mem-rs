@@ -1,71 +1,36 @@
-use crate::{RawMem, HOPE_PAGE_SIZE};
+use crate::DEFAULT_PAGE_SIZE;
 use std::io;
 use std::io::Error;
-use std::io::ErrorKind;
+
 use std::ptr::NonNull;
 
-pub(crate) struct Base {
-    occupied: usize,
-    allocated: usize,
-    ptr: NonNull<[u8]>,
+pub(crate) struct Base<T> {
+    pub ptr: NonNull<[T]>,
+    pub occupied: usize,
 }
 
-impl Base {
-    pub const PAGE_SIZE: usize = HOPE_PAGE_SIZE;
+impl<T> Base<T> {
+    pub const PAGE_SIZE: usize = DEFAULT_PAGE_SIZE;
     pub const MINIMUM_CAPACITY: usize = Self::PAGE_SIZE;
 
-    pub fn new(ptr: NonNull<[u8]>) -> Self {
-        Self {
-            occupied: 0,
-            allocated: 0,
-            ptr,
-        }
+    pub fn new(ptr: NonNull<[T]>) -> Self {
+        Self { ptr, occupied: 0 }
     }
 
-    pub fn set_ptr(&mut self, ptr: NonNull<[u8]>) {
-        self.ptr = ptr;
-    }
-}
-
-impl RawMem for Base {
-    fn ptr(&self) -> NonNull<[u8]> {
-        self.ptr
+    pub fn allocated(&self) -> usize {
+        self.ptr.len()
     }
 
-    #[rustfmt::skip]
-    fn alloc(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
-        //if capacity >= self.allocated {
-        self.allocated = capacity;
-        Ok(self.ptr)
-        // TODO:
-        // } else {
-        //     Err(Error::new(
-        //         ErrorKind::Other,
-        //         "cannot reserve less than the memory occupied",
-        //     ))
-        // }
-    }
-
-    fn allocated(&self) -> usize {
-        self.allocated
-    }
-
-    fn occupy(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
-        if capacity <= self.allocated {
+    pub fn occupy(&mut self, capacity: usize) -> io::Result<()> {
+        if capacity <= self.allocated() {
             self.occupied = capacity;
-            Ok(self.ptr)
+            Ok(())
         } else {
-            Err(Error::new(
-                ErrorKind::Other,
-                format!(
-                    "cannot occupy {} - allocated only {} bytes",
-                    capacity, self.allocated
-                ),
-            ))
+            Err(Error::other(format!(
+                "cannot occupy {} - allocated only {}",
+                capacity,
+                self.allocated()
+            )))
         }
-    }
-
-    fn occupied(&self) -> usize {
-        self.occupied
     }
 }

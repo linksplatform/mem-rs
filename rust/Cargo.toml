@@ -1,7 +1,7 @@
 [package]
 name = "platform-mem"
 version = "0.1.0-aplha.5"
-edition = "2018"
+edition = "2021"
 authors = ["uselesssgoddess", "Linksplatform Team <linksplatformtechnologies@gmail.com>"]
 license = "LGPL-3.0"
 repository = "https://github.com/linksplatform/platform-rs"
@@ -11,7 +11,7 @@ Memory for linksplatform
 """
 
 [dependencies]
-memmap2 = "0.5.3"
-tempfile = "3.3.0"
+memmap2 = "0.5"
+tempfile = "3.3"
 
 platform-num = { version = "0.1.0-aplha.0" }

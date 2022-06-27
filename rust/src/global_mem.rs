@@ -1,95 +1,90 @@
-use std::alloc::Layout;
-use std::cmp::max;
-use std::ops::Add;
+use crate::{internal, Base, RawMem};
+use std::mem::size_of;
+use std::{
+    alloc::{self, Layout, LayoutError},
+    io,
+    ptr::{self, NonNull},
+};
 
-use crate::{Base, RawMem};
-use std::ptr::NonNull;
-use std::{alloc, io, ptr};
+pub struct GlobalMem<T>(Base<T>);
 
-pub struct GlobalMem {
-    base: Base,
-}
-
-impl GlobalMem {
-    pub fn reserve_new(mut capacity: usize) -> io::Result<Self> {
-        capacity = max(capacity, Base::MINIMUM_CAPACITY);
-        let mut new = GlobalMem {
-            base: Base::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0)),
-        };
-        unsafe {
-            new.on_reserved_impl(capacity, false)?;
-        }
-        Ok(new)
-    }
-
-    pub fn new() -> std::io::Result<Self> {
-        Self::reserve_new(Base::MINIMUM_CAPACITY)
+impl<T: Default> GlobalMem<T> {
+    pub fn new() -> Self {
+        Self(Base::new(NonNull::slice_from_raw_parts(
+            NonNull::dangling(),
+            0,
+        )))
     }
 
     fn layout_impl(capacity: usize) -> io::Result<Layout> {
-        Layout::array::<u8>(capacity).map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+        Layout::array::<T>(capacity).map_err(io::Error::other)
     }
 
-    unsafe fn on_reserved_impl(
-        &mut self,
-        new_capacity: usize,
-        reallocate: bool,
-    ) -> io::Result<NonNull<[u8]>> {
-        let old_capacity = self.base.allocated();
-        self.base.alloc(new_capacity)?;
-
-        if !reallocate {
+    unsafe fn on_reserved_impl(&mut self, new_capacity: usize) -> io::Result<&mut [T]> {
+        let old_capacity = self.0.allocated();
+        let ptr = if self.0.ptr.as_non_null_ptr() == NonNull::dangling() {
             let layout = Self::layout_impl(new_capacity)?;
             let ptr = alloc::alloc_zeroed(layout);
-            self.base.set_ptr(NonNull::slice_from_raw_parts(
-                NonNull::new_unchecked(ptr),
-                layout.size(),
-            ));
+            NonNull::slice_from_raw_parts(NonNull::new_unchecked(ptr), layout.size())
         } else {
-            let ptr = self.ptr();
+            let new_capacity = new_capacity * size_of::<T>();
+            let ptr = internal::align_from(self.0.ptr);
             let layout = Self::layout_impl(old_capacity)?;
             let new = alloc::realloc(ptr.as_mut_ptr(), layout, new_capacity);
-            if old_capacity < new_capacity {
-                let offset = new_capacity - old_capacity;
-                ptr::write_bytes(new.add(old_capacity), 0, offset);
-            }
-            self.base.set_ptr(NonNull::slice_from_raw_parts(
-                NonNull::new_unchecked(new),
-                new_capacity,
-            ));
+            NonNull::slice_from_raw_parts(NonNull::new_unchecked(new), new_capacity)
+        };
+
+        self.0.ptr = internal::guaranteed_align_to(ptr);
+        for i in old_capacity..new_capacity {
+            self.0.ptr.as_mut_ptr().add(i).write(T::default());
         }
-        Ok(self.ptr())
+        Ok(self.0.ptr.as_mut())
     }
 }
 
-impl RawMem for GlobalMem {
-    fn ptr(&self) -> NonNull<[u8]> {
-        self.base.ptr()
+impl<T: Default> Default for GlobalMem<T> {
+    fn default() -> Self {
+        Self::new()
     }
+}
 
-    fn alloc(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
-        unsafe { self.on_reserved_impl(capacity, true) }
+impl<T: Default> RawMem<T> for GlobalMem<T> {
+    fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+        unsafe { self.on_reserved_impl(capacity) }
     }
 
     fn allocated(&self) -> usize {
-        self.base.allocated()
+        self.0.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
-        self.base.occupy(capacity)
+    fn occupy(&mut self, capacity: usize) -> io::Result<()> {
+        self.0.occupy(capacity)
     }
 
     fn occupied(&self) -> usize {
-        self.base.occupied()
+        self.0.occupied
     }
 }
 
-impl Drop for GlobalMem {
+impl<T> Drop for GlobalMem<T> {
     fn drop(&mut self) {
+        // SAFETY: ptr is valid slice
+        // SAFETY: items is friendly to drop
         unsafe {
-            let ptr = self.ptr();
-            let layout = Layout::array::<u8>(ptr.len()).unwrap(); // TODO: check later
-            alloc::dealloc(ptr.as_mut_ptr(), layout)
+            let slice = self.0.ptr.as_mut();
+            for item in slice {
+                ptr::drop_in_place(item);
+            }
         }
+
+        let _: Result<_, LayoutError> = try {
+            let ptr = self.0.ptr;
+            let layout = Layout::array::<T>(ptr.len())?;
+            // SAFETY: ptr is valid slice
+            unsafe {
+                let ptr = ptr.as_non_null_ptr().cast();
+                alloc::dealloc(ptr.as_ptr(), layout);
+            }
+        };
     }
 }

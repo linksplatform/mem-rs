@@ -2,24 +2,20 @@ use crate::{FileMappedMem, RawMem};
 
 use std::io;
 
-use std::ptr::NonNull;
+
 
 #[repr(transparent)]
-pub struct TempFileMem(FileMappedMem);
+pub struct TempFileMem<T>(FileMappedMem<T>);
 
-impl TempFileMem {
+impl<T: Default> TempFileMem<T> {
     pub fn new() -> io::Result<Self> {
         let file = tempfile::tempfile()?;
         Ok(TempFileMem(FileMappedMem::new(file)?))
     }
 }
 
-impl RawMem for TempFileMem {
-    fn ptr(&self) -> NonNull<[u8]> {
-        self.0.ptr()
-    }
-
-    fn alloc(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
+impl<T: Default> RawMem<T> for TempFileMem<T> {
+    fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]> {
         self.0.alloc(capacity)
     }
 
@@ -27,7 +23,7 @@ impl RawMem for TempFileMem {
         self.0.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
+    fn occupy(&mut self, capacity: usize) -> io::Result<()> {
         self.0.occupy(capacity)
     }
 
