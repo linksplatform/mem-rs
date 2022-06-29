@@ -9,12 +9,14 @@ fn file() -> io::Result<File> {
 fn basic() -> Result<(), Box<dyn Error>> {
     let mut mem = FileMappedMem::<usize>::new(file()?)?;
     let slice = mem.alloc(10)?;
+    assert_eq!(slice.len(), 10);
 
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
 
     assert_eq!(slice, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     let slice = mem.alloc(20)?;
+    assert_eq!(slice.len(), 20);
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
 
     assert_eq!(

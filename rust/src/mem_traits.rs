@@ -1,6 +1,5 @@
 use std::io;
 
-
 pub const DEFAULT_PAGE_SIZE: usize = 8 * 1024;
 
 pub trait RawMem<T> {

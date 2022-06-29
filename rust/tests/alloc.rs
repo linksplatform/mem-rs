@@ -8,11 +8,14 @@ fn basic() -> Result<(), Box<dyn Error>> {
     let mut mem = AllocMem::<usize, _>::new(Global);
     let slice = mem.alloc(10)?;
 
+    assert_eq!(slice.len(), 10);
+
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
 
     assert_eq!(slice, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     let slice = mem.alloc(20)?;
+    assert_eq!(slice.len(), 20);
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
 
     assert_eq!(
@@ -26,6 +29,7 @@ fn basic() -> Result<(), Box<dyn Error>> {
 fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     let mut mem = AllocMem::<String, _>::new(Global);
     let slice = mem.alloc(10)?;
+    assert_eq!(slice.len(), 10);
 
     slice
         .iter_mut()
@@ -35,6 +39,7 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     assert_eq!(slice, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
     let slice = mem.alloc(20)?;
+    assert_eq!(slice.len(), 20);
     slice
         .iter_mut()
         .enumerate()
