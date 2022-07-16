@@ -1,6 +1,13 @@
+use std::alloc::Global;
 use std::io;
 
-pub const DEFAULT_PAGE_SIZE: usize = 8 * 1024;
+// Bare metal platforms usually have very small amounts of RAM
+// (in the order of hundreds of KB)
+pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") {
+    512
+} else {
+    8 * 1024
+};
 
 pub trait RawMem<T> {
     fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]>;
@@ -19,13 +26,13 @@ pub trait RawMem<T> {
         self.alloc(allocated - capacity)
     }
 
-    fn grow_occupied(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+    fn grow_occupied(&mut self, capacity: usize) -> io::Result<()> {
         let occupied = self.occupied();
-        self.alloc(occupied + capacity)
+        self.occupy(occupied + capacity)
     }
 
-    fn shrink_occupied(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+    fn shrink_occupied(&mut self, capacity: usize) -> io::Result<()> {
         let occupied = self.occupied();
-        self.alloc(occupied - capacity)
+        self.occupy(occupied - capacity)
     }
 }
