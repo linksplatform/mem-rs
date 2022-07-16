@@ -69,8 +69,6 @@ impl<T: Default> RawMem<T> for FileMappedMem<T> {
     }
 
     fn allocated(&self) -> usize {
-        println!("!{}!", self.file.metadata().unwrap().len());
-        println!("?{}?", self.mapping.len());
         self.allocated
     }
 
