@@ -3,11 +3,8 @@ use std::io;
 
 // Bare metal platforms usually have very small amounts of RAM
 // (in the order of hundreds of KB)
-pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") {
-    512
-} else {
-    8 * 1024
-};
+#[rustfmt::skip]
+pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else { 8 * 1024 };
 
 pub trait RawMem<T> {
     fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]>;
