@@ -23,9 +23,6 @@ impl<T: Default> FileMappedMem<T> {
         let capacity = Base::<T>::MINIMUM_CAPACITY / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
-        let len = file.metadata()?.len() as usize;
-        let to_reserve = max(len, capacity);
-
         let mut new = Self {
             allocated: 0,
             base: Base::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0)),
@@ -33,13 +30,13 @@ impl<T: Default> FileMappedMem<T> {
             file,
         };
 
-        new.alloc_impl(to_reserve).map(|_| new)
+        new.alloc_impl(capacity).map(|_| new)
     }
 
-    unsafe fn map(&mut self, capacity: usize) -> io::Result<NonNull<[u8]>> {
+    unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
         let mapping = MmapOptions::new().len(capacity).map_mut(&self.file)?;
         self.mapping = ManuallyDrop::new(mapping);
-        Ok(NonNull::from(self.mapping.as_mut()))
+        Ok(self.mapping.as_mut())
     }
 
     unsafe fn unmap(&mut self) {
@@ -48,18 +45,17 @@ impl<T: Default> FileMappedMem<T> {
 
     fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
         self.allocated = capacity;
+        let alloc_cap = capacity * size_of::<T>();
 
         // SAFETY: `self.mapping` is initialized
         unsafe {
             self.unmap();
         }
         let file_len = self.file.metadata()?.len();
-        self.file.set_len(file_len.max(capacity as u64))?;
+        self.file.set_len(max(file_len, alloc_cap as u64))?;
 
-        let ptr = unsafe { self.map(capacity) }?;
-        let ptr =
-            NonNull::slice_from_raw_parts(ptr.as_non_null_ptr(), self.allocated * size_of::<T>());
-        self.base.ptr = internal::guaranteed_align_to(ptr);
+        let bytes = unsafe { self.map(alloc_cap) }?;
+        self.base.ptr = NonNull::from(internal::guaranteed_align_slice(bytes));
         Ok(())
     }
 }
@@ -73,6 +69,8 @@ impl<T: Default> RawMem<T> for FileMappedMem<T> {
     }
 
     fn allocated(&self) -> usize {
+        println!("!{}!", self.file.metadata().unwrap().len());
+        println!("?{}?", self.mapping.len());
         self.allocated
     }
 
@@ -104,7 +102,6 @@ impl<T> Drop for FileMappedMem<T> {
         }
 
         let _: Result<_, Box<dyn Error>> = try {
-            self.file.set_len(self.allocated as u64)?;
             self.file.sync_all()?;
         };
     }

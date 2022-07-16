@@ -2,8 +2,6 @@ use crate::{FileMappedMem, RawMem};
 
 use std::io;
 
-
-
 #[repr(transparent)]
 pub struct TempFileMem<T>(FileMappedMem<T>);
 

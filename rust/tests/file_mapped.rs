@@ -51,5 +51,9 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
             "16", "17", "18", "19"
         ]
     );
+
+    println!("{}", mem.allocated());
+    println!("{}", mem.occupied());
+
     Ok(())
 }
