@@ -8,8 +8,6 @@
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
 
-extern crate core;
-
 pub use alloc::Alloc;
 pub use file_mapped::FileMapped;
 pub use global::Global;
