@@ -9,11 +9,11 @@ pub(crate) struct Base<T> {
 impl<T> Base<T> {
     pub const MIN_CAPACITY: usize = DEFAULT_PAGE_SIZE;
 
-    pub fn new(ptr: NonNull<[T]>) -> Self {
+    pub const fn new(ptr: NonNull<[T]>) -> Self {
         Self { ptr, occupied: 0 }
     }
 
-    pub fn dangling() -> Self {
+    pub const fn dangling() -> Self {
         Self::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0))
     }
 

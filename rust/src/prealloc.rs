@@ -3,18 +3,18 @@ use std::marker::PhantomData;
 
 pub struct PreAlloc<T, D> {
     data: D,
-    allocated: usize,
     occupied: usize,
+    allocated: usize,
     // mark Self as owned of Sized `[T]`
     marker: PhantomData<Box<[T]>>,
 }
 
 impl<T, D: AsMut<[T]>> PreAlloc<T, D> {
-    pub fn new(data: D) -> Self {
+    pub const fn new(data: D) -> Self {
         Self {
             data,
-            allocated: 0,
             occupied: 0,
+            allocated: 0,
             marker: PhantomData,
         }
     }

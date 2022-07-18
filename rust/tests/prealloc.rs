@@ -33,11 +33,7 @@ fn basic() -> Result<(), Box<dyn Error>> {
 fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     // fixme: RFC #2920
     //  let prealloc = [String::new(); 20];
-    let prealloc: [String; 20] = (0..20)
-        .map(|_| String::new())
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
+    let prealloc: Vec<_> = (0..20).map(|_| String::new()).collect();
 
     let mut mem = PreAlloc::new(prealloc);
     let slice = mem.alloc(10)?;

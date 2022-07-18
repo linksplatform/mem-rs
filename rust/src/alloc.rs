@@ -12,7 +12,7 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T: Default, A: Allocator> Alloc<T, A> {
-    pub fn new(alloc: A) -> Self {
+    pub const fn new(alloc: A) -> Self {
         Self {
             base: Base::dangling(),
             alloc,
@@ -96,3 +96,6 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
         };
     }
 }
+
+unsafe impl<T: Sync, A: Allocator + Sync> Sync for Alloc<T, A> {}
+unsafe impl<T: Send, A: Allocator + Send> Send for Alloc<T, A> {}

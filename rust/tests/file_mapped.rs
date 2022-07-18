@@ -1,3 +1,5 @@
+#![cfg(not(miri))]
+
 use platform_mem::{FileMapped, RawMem};
 use std::{error::Error, fs::File, io};
 

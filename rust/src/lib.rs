@@ -1,3 +1,4 @@
+#![feature(const_nonnull_slice_from_raw_parts)]
 #![feature(nonnull_slice_from_raw_parts)]
 #![feature(allocator_api)]
 #![feature(default_free_fn)]
@@ -6,6 +7,8 @@
 #![feature(try_blocks)]
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
+
+extern crate core;
 
 pub use alloc::Alloc;
 pub use file_mapped::FileMapped;

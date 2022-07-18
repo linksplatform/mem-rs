@@ -1,12 +1,21 @@
 use crate::{FileMapped, RawMem, Result};
+use std::{fs::File, io, path::Path};
 
 #[repr(transparent)]
 pub struct TempFile<T>(FileMapped<T>);
 
 impl<T: Default> TempFile<T> {
     pub fn new() -> Result<Self> {
-        let file = tempfile::tempfile()?;
-        Ok(Self(FileMapped::new(file)?))
+        Self::from_file(tempfile::tempfile())
+    }
+
+    pub fn new_in<P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::from_file(tempfile::tempfile_in(path))
+    }
+
+    fn from_file(file: io::Result<File>) -> Result<Self> {
+        file.map_err(Into::into)
+            .and_then(|file| FileMapped::new(file).map(Self))
     }
 }
 

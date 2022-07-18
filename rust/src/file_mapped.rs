@@ -60,7 +60,10 @@ impl<T: Default> FileMapped<T> {
         self.file.set_len(max(file_len, alloc_cap as u64))?;
 
         let bytes = unsafe { self.map(alloc_cap) }?;
-        self.base.ptr = NonNull::from(internal::guaranteed_align_slice(bytes));
+        // SAFETY: type is safe to slice from bytes
+        unsafe {
+            self.base.ptr = NonNull::from(internal::guaranteed_align_slice(bytes));
+        }
         Ok(())
     }
 }
@@ -110,3 +113,6 @@ impl<T> Drop for FileMapped<T> {
         };
     }
 }
+
+unsafe impl<T: Sync> Sync for FileMapped<T> {}
+unsafe impl<T: Send> Send for FileMapped<T> {}

@@ -8,11 +8,8 @@ use std::{
 pub struct Global<T>(Base<T>);
 
 impl<T: Default> Global<T> {
-    pub fn new() -> Self {
-        Self(Base::new(NonNull::slice_from_raw_parts(
-            NonNull::dangling(),
-            0,
-        )))
+    pub const fn new() -> Self {
+        Self(Base::dangling())
     }
 
     fn layout_impl(capacity: usize) -> Result<Layout> {
@@ -87,3 +84,6 @@ impl<T> Drop for Global<T> {
         };
     }
 }
+
+unsafe impl<T: Sync> Sync for Global<T> {}
+unsafe impl<T: Send> Send for Global<T> {}
