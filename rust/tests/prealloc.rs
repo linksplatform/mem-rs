@@ -1,14 +1,15 @@
-use platform_mem::{FileMapped, RawMem};
-use std::{error::Error, fs::File, io};
+#![feature(allocator_api)]
 
-fn file() -> io::Result<File> {
-    tempfile::tempfile()
-}
+use platform_mem::{PreAlloc, RawMem};
+use std::error::Error;
 
 #[test]
 fn basic() -> Result<(), Box<dyn Error>> {
-    let mut mem = FileMapped::<usize>::new(file()?)?;
+    let prealloc = [0usize; 20];
+
+    let mut mem = PreAlloc::new(prealloc);
     let slice = mem.alloc(10)?;
+
     assert_eq!(slice.len(), 10);
 
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
@@ -30,8 +31,17 @@ fn basic() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
-    let mut mem = FileMapped::<String>::new(file()?)?;
+    // fixme: RFC #2920
+    //  let prealloc = [String::new(); 20];
+    let prealloc: [String; 20] = (0..20)
+        .map(|_| String::new())
+        .collect::<Vec<_>>()
+        .try_into()
+        .unwrap();
+
+    let mut mem = PreAlloc::new(prealloc);
     let slice = mem.alloc(10)?;
+    assert_eq!(slice.len(), 10);
 
     slice
         .iter_mut()
@@ -41,6 +51,7 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     assert_eq!(slice, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
     let slice = mem.alloc(20)?;
+    assert_eq!(slice.len(), 20);
     slice
         .iter_mut()
         .enumerate()
@@ -53,6 +64,5 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
             "16", "17", "18", "19"
         ]
     );
-
     Ok(())
 }

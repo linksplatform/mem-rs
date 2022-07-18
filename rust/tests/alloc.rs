@@ -1,11 +1,11 @@
 #![feature(allocator_api)]
 
-use platform_mem::{AllocMem, RawMem};
+use platform_mem::{Alloc, RawMem};
 use std::{alloc::Global, error::Error};
 
 #[test]
 fn basic() -> Result<(), Box<dyn Error>> {
-    let mut mem = AllocMem::<usize, _>::new(Global);
+    let mut mem = Alloc::<usize, _>::new(Global);
     let slice = mem.alloc(10)?;
 
     assert_eq!(slice.len(), 10);
@@ -27,7 +27,7 @@ fn basic() -> Result<(), Box<dyn Error>> {
 
 #[test]
 fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
-    let mut mem = AllocMem::<String, _>::new(Global);
+    let mut mem = Alloc::<String, _>::new(Global);
     let slice = mem.alloc(10)?;
     assert_eq!(slice.len(), 10);
 

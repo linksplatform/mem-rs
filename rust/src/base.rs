@@ -1,7 +1,4 @@
-use crate::DEFAULT_PAGE_SIZE;
-use std::io;
-use std::io::Error;
-
+use crate::{Error, Result, DEFAULT_PAGE_SIZE};
 use std::ptr::NonNull;
 
 pub(crate) struct Base<T> {
@@ -10,27 +7,30 @@ pub(crate) struct Base<T> {
 }
 
 impl<T> Base<T> {
-    pub const PAGE_SIZE: usize = DEFAULT_PAGE_SIZE;
-    pub const MINIMUM_CAPACITY: usize = Self::PAGE_SIZE;
+    pub const MIN_CAPACITY: usize = DEFAULT_PAGE_SIZE;
 
     pub fn new(ptr: NonNull<[T]>) -> Self {
         Self { ptr, occupied: 0 }
+    }
+
+    pub fn dangling() -> Self {
+        Self::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0))
     }
 
     pub fn allocated(&self) -> usize {
         self.ptr.len()
     }
 
-    pub fn occupy(&mut self, capacity: usize) -> io::Result<()> {
-        if capacity <= self.allocated() {
+    pub fn occupy(&mut self, capacity: usize) -> Result<()> {
+        let allocated = self.allocated();
+        if capacity <= allocated {
             self.occupied = capacity;
             Ok(())
         } else {
-            Err(Error::other(format!(
-                "cannot occupy {} - allocated only {}",
-                capacity,
-                self.allocated()
-            )))
+            Err(Error::OverOccupy {
+                allocated,
+                to_occupy: capacity,
+            })
         }
     }
 }

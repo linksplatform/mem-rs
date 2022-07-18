@@ -1,31 +1,27 @@
-use crate::base::Base;
-use crate::{internal, RawMem};
+use crate::{base::Base, internal, RawMem, Result};
 use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,
-    error::Error,
     fs::File,
-    io,
     mem::{size_of, ManuallyDrop},
+    path::Path,
     ptr,
     ptr::NonNull,
 };
 
-pub struct FileMappedMem<T> {
+pub struct FileMapped<T> {
     base: Base<T>,
-    allocated: usize,
     pub(crate) file: File,
     mapping: ManuallyDrop<MmapMut>, // TODO: `MaybeUninit`
 }
 
-impl<T: Default> FileMappedMem<T> {
-    pub fn new(file: File) -> io::Result<Self> {
-        let capacity = Base::<T>::MINIMUM_CAPACITY / size_of::<T>();
+impl<T: Default> FileMapped<T> {
+    pub fn new(file: File) -> Result<Self> {
+        let capacity = Base::<T>::MIN_CAPACITY / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
         let mut new = Self {
-            allocated: 0,
-            base: Base::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0)),
+            base: Base::dangling(),
             mapping: ManuallyDrop::new(mapping),
             file,
         };
@@ -33,7 +29,17 @@ impl<T: Default> FileMappedMem<T> {
         new.alloc_impl(capacity).map(|_| new)
     }
 
-    unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+        File::options()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(path)
+            .map_err(Into::into)
+            .and_then(Self::new)
+    }
+
+    unsafe fn map(&mut self, capacity: usize) -> Result<&mut [u8]> {
         let mapping = MmapOptions::new().len(capacity).map_mut(&self.file)?;
         self.mapping = ManuallyDrop::new(mapping);
         Ok(self.mapping.as_mut())
@@ -43,8 +49,7 @@ impl<T: Default> FileMappedMem<T> {
         ManuallyDrop::drop(&mut self.mapping)
     }
 
-    fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
-        self.allocated = capacity;
+    fn alloc_impl(&mut self, capacity: usize) -> Result<()> {
         let alloc_cap = capacity * size_of::<T>();
 
         // SAFETY: `self.mapping` is initialized
@@ -60,8 +65,8 @@ impl<T: Default> FileMappedMem<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for FileMappedMem<T> {
-    fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+impl<T: Default> RawMem<T> for FileMapped<T> {
+    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.alloc_impl(capacity)?;
 
         // SAFETY: `ptr` is valid slice
@@ -69,10 +74,10 @@ impl<T: Default> RawMem<T> for FileMappedMem<T> {
     }
 
     fn allocated(&self) -> usize {
-        self.allocated
+        self.base.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> io::Result<()> {
+    fn occupy(&mut self, capacity: usize) -> Result<()> {
         self.base.occupy(capacity)
     }
 
@@ -81,13 +86,14 @@ impl<T: Default> RawMem<T> for FileMappedMem<T> {
     }
 }
 
-impl<T> Drop for FileMappedMem<T> {
+impl<T> Drop for FileMapped<T> {
     fn drop(&mut self) {
         // SAFETY: `slice` is valid file piece
         // SAFETY: items is friendly to drop
         unsafe {
             let ptr = self.base.ptr;
-            let mut ptr = NonNull::slice_from_raw_parts(ptr.as_non_null_ptr(), self.allocated);
+            let mut ptr =
+                NonNull::slice_from_raw_parts(ptr.as_non_null_ptr(), self.base.allocated());
             let slice = ptr.as_mut();
             for item in slice {
                 ptr::drop_in_place(item);
@@ -99,7 +105,7 @@ impl<T> Drop for FileMappedMem<T> {
             ManuallyDrop::drop(&mut self.mapping);
         }
 
-        let _: Result<_, Box<dyn Error>> = try {
+        let _: Result<_> = try {
             self.file.sync_all()?;
         };
     }

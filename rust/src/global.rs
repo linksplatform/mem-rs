@@ -1,14 +1,13 @@
-use crate::{internal, Base, RawMem};
-use std::mem::size_of;
+use crate::{internal, Base, RawMem, Result};
 use std::{
-    alloc::{self, Layout, LayoutError},
-    io,
+    alloc::{self, Layout},
+    mem::size_of,
     ptr::{self, NonNull},
 };
 
-pub struct GlobalMem<T>(Base<T>);
+pub struct Global<T>(Base<T>);
 
-impl<T: Default> GlobalMem<T> {
+impl<T: Default> Global<T> {
     pub fn new() -> Self {
         Self(Base::new(NonNull::slice_from_raw_parts(
             NonNull::dangling(),
@@ -16,11 +15,11 @@ impl<T: Default> GlobalMem<T> {
         )))
     }
 
-    fn layout_impl(capacity: usize) -> io::Result<Layout> {
-        Layout::array::<T>(capacity).map_err(io::Error::other)
+    fn layout_impl(capacity: usize) -> Result<Layout> {
+        Layout::array::<T>(capacity).map_err(Into::into)
     }
 
-    unsafe fn on_reserved_impl(&mut self, new_capacity: usize) -> io::Result<&mut [T]> {
+    unsafe fn on_reserved_impl(&mut self, new_capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.0.allocated();
         let ptr = if self.0.ptr.as_non_null_ptr() == NonNull::dangling() {
             let layout = Self::layout_impl(new_capacity)?;
@@ -42,14 +41,14 @@ impl<T: Default> GlobalMem<T> {
     }
 }
 
-impl<T: Default> Default for GlobalMem<T> {
+impl<T: Default> Default for Global<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Default> RawMem<T> for GlobalMem<T> {
-    fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+impl<T: Default> RawMem<T> for Global<T> {
+    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.on_reserved_impl(capacity) }
     }
 
@@ -57,7 +56,7 @@ impl<T: Default> RawMem<T> for GlobalMem<T> {
         self.0.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> io::Result<()> {
+    fn occupy(&mut self, capacity: usize) -> Result<()> {
         self.0.occupy(capacity)
     }
 
@@ -66,7 +65,7 @@ impl<T: Default> RawMem<T> for GlobalMem<T> {
     }
 }
 
-impl<T> Drop for GlobalMem<T> {
+impl<T> Drop for Global<T> {
     fn drop(&mut self) {
         // SAFETY: ptr is valid slice
         // SAFETY: items is friendly to drop
@@ -77,7 +76,7 @@ impl<T> Drop for GlobalMem<T> {
             }
         }
 
-        let _: Result<_, LayoutError> = try {
+        let _: Result<_> = try {
             let ptr = self.0.ptr;
             let layout = Layout::array::<T>(ptr.len())?;
             // SAFETY: ptr is valid slice

@@ -7,18 +7,20 @@
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
 
-pub use alloc_mem::AllocMem;
-pub use file_mapped_mem::FileMappedMem;
-pub use global_mem::GlobalMem;
-pub use mem_traits::{RawMem, DEFAULT_PAGE_SIZE};
-pub use temp_file_mem::TempFileMem;
+pub use alloc::Alloc;
+pub use file_mapped::FileMapped;
+pub use global::Global;
+pub use prealloc::PreAlloc;
+pub use temp_file::TempFile;
+pub use traits::{Error, RawMem, Result, DEFAULT_PAGE_SIZE};
 
-mod alloc_mem;
+mod alloc;
 mod base;
-mod file_mapped_mem;
-mod global_mem;
+mod file_mapped;
+mod global;
 mod internal;
-mod mem_traits;
-mod temp_file_mem;
+mod prealloc;
+mod temp_file;
+mod traits;
 
 pub(crate) use base::Base;

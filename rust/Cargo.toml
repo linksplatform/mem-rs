@@ -13,5 +13,6 @@ Memory for linksplatform
 [dependencies]
 memmap2 = "0.5"
 tempfile = "3.3"
+thiserror = "1.0"
 
 platform-num = { version = "0.1.0-aplha.0" }

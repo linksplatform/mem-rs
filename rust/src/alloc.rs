@@ -1,31 +1,29 @@
-use crate::{base::Base, internal, RawMem};
-use std::alloc::LayoutError;
-use std::cmp::Ordering;
+use crate::{base::Base, internal, RawMem, Result};
 use std::{
     alloc::{Allocator, Layout},
-    error::Error,
-    io, ptr,
+    cmp::Ordering,
+    ptr,
     ptr::NonNull,
 };
 
-pub struct AllocMem<T, A: Allocator> {
+pub struct Alloc<T, A: Allocator> {
     base: Base<T>,
     alloc: A,
 }
 
-impl<T: Default, A: Allocator> AllocMem<T, A> {
+impl<T: Default, A: Allocator> Alloc<T, A> {
     pub fn new(alloc: A) -> Self {
         Self {
-            base: Base::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0)),
+            base: Base::dangling(),
             alloc,
         }
     }
 
-    unsafe fn alloc_impl(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+    unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.base.ptr.len();
         let new_capacity = capacity;
 
-        let result: Result<_, Box<dyn Error + Sync + Send>> = try {
+        let result: Result<_> = try {
             if self.base.ptr.as_non_null_ptr() == NonNull::dangling() {
                 let layout = Layout::array::<T>(capacity)?;
                 self.alloc.allocate_zeroed(layout)?
@@ -48,28 +46,26 @@ impl<T: Default, A: Allocator> AllocMem<T, A> {
             }
         };
 
-        result
-            .map(|ptr| {
-                self.base.ptr = internal::guaranteed_align_to(ptr);
-                for i in old_capacity..new_capacity {
-                    self.base.ptr.as_mut_ptr().add(i).write(T::default());
-                }
-                self.base.ptr.as_mut()
-            })
-            .map_err(io::Error::other)
+        result.map(|ptr| {
+            self.base.ptr = internal::guaranteed_align_to(ptr);
+            for i in old_capacity..new_capacity {
+                self.base.ptr.as_mut_ptr().add(i).write(T::default());
+            }
+            self.base.ptr.as_mut()
+        })
     }
 }
 
-impl<T: Default, A: Allocator> RawMem<T> for AllocMem<T, A> {
-    fn alloc(&mut self, capacity: usize) -> io::Result<&mut [T]> {
+impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A> {
+    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.alloc_impl(capacity) }
     }
 
     fn allocated(&self) -> usize {
-        self.base.ptr.len()
+        self.base.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> io::Result<()> {
+    fn occupy(&mut self, capacity: usize) -> Result<()> {
         self.base.occupy(capacity)
     }
 
@@ -78,7 +74,7 @@ impl<T: Default, A: Allocator> RawMem<T> for AllocMem<T, A> {
     }
 }
 
-impl<T, A: Allocator> Drop for AllocMem<T, A> {
+impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
         // SAFETY: ptr is valid slice
         // SAFETY: items is friendly to drop
@@ -89,7 +85,7 @@ impl<T, A: Allocator> Drop for AllocMem<T, A> {
             }
         }
 
-        let _: Result<_, LayoutError> = try {
+        let _: Result<_> = try {
             let ptr = self.base.ptr;
             let layout = Layout::array::<T>(ptr.len())?;
             // SAFETY: ptr is valid slice
