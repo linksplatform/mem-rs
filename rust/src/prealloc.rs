@@ -1,5 +1,5 @@
 use crate::{Error, RawMem, Result};
-use std::{marker::PhantomData};
+use std::marker::PhantomData;
 
 pub struct PreAlloc<T, D> {
     data: D,
@@ -11,7 +11,7 @@ pub struct PreAlloc<T, D> {
 
 impl<T, D: AsMut<[T]>> PreAlloc<T, D> {
     pub fn new(data: D) -> Self {
-        PreAlloc {
+        Self {
             data,
             allocated: 0,
             occupied: 0,

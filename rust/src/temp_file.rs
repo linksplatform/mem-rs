@@ -1,14 +1,12 @@
 use crate::{FileMapped, RawMem, Result};
 
-
-
 #[repr(transparent)]
 pub struct TempFile<T>(FileMapped<T>);
 
 impl<T: Default> TempFile<T> {
     pub fn new() -> Result<Self> {
         let file = tempfile::tempfile()?;
-        Ok(TempFile(FileMapped::new(file)?))
+        Ok(Self(FileMapped::new(file)?))
     }
 }
 
