@@ -14,8 +14,7 @@ impl<T: Default> TempFile<T> {
     }
 
     fn from_file(file: io::Result<File>) -> Result<Self> {
-        file.map_err(Into::into)
-            .and_then(|file| FileMapped::new(file).map(Self))
+        file.and_then(FileMapped::new).map(Self).map_err(Into::into)
     }
 }
 

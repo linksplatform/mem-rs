@@ -3,6 +3,7 @@ use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,
     fs::File,
+    io,
     mem::{size_of, ManuallyDrop},
     path::Path,
     ptr,
@@ -16,7 +17,7 @@ pub struct FileMapped<T> {
 }
 
 impl<T: Default> FileMapped<T> {
-    pub fn new(file: File) -> Result<Self> {
+    pub fn new(file: File) -> io::Result<Self> {
         let capacity = Base::<T>::MIN_CAPACITY / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
@@ -29,17 +30,16 @@ impl<T: Default> FileMapped<T> {
         new.alloc_impl(capacity).map(|_| new)
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         File::options()
             .create(true)
             .read(true)
             .write(true)
             .open(path)
-            .map_err(Into::into)
             .and_then(Self::new)
     }
 
-    unsafe fn map(&mut self, capacity: usize) -> Result<&mut [u8]> {
+    unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
         let mapping = MmapOptions::new().len(capacity).map_mut(&self.file)?;
         self.mapping = ManuallyDrop::new(mapping);
         Ok(self.mapping.as_mut())
@@ -49,7 +49,7 @@ impl<T: Default> FileMapped<T> {
         ManuallyDrop::drop(&mut self.mapping)
     }
 
-    fn alloc_impl(&mut self, capacity: usize) -> Result<()> {
+    fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
         let alloc_cap = capacity * size_of::<T>();
 
         // SAFETY: `self.mapping` is initialized
