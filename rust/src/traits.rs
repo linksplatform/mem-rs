@@ -24,7 +24,7 @@ pub enum Error {
     /// Memory allocator return an error
     #[error(transparent)]
     AllocError(#[from] AllocError),
-    /// Memory allocator accept incorrect [`Layout`][]
+    /// Memory allocator accept incorrect [`Layout`](std::alloc::Layout)
     #[error(transparent)]
     LayoutError(#[from] LayoutError),
     /// System error memory allocation occurred
@@ -117,7 +117,7 @@ pub trait RawMem<T> {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the occupied memory is already at the upper bound
+    /// Returns error if the occupied memory is already at the upper bound
     /// (that is, when `occupied + capacity` is great than `allocated` or overflowing).
     fn grow_occupied(&mut self, capacity: usize) -> Result<()> {
         self.occupied()
@@ -130,7 +130,7 @@ pub trait RawMem<T> {
     ///
     /// # Errors
     ///
-    /// Returns `Err` if the occupied memory is less than `capacity` (that is, when overflowing).
+    /// Returns error if the occupied memory is less than `capacity` (that is, when overflowing).
     fn shrink_occupied(&mut self, capacity: usize) -> Result<()> {
         self.occupied()
             .checked_sub(capacity)
