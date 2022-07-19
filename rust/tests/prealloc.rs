@@ -65,15 +65,14 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
 }
 
 #[quickcheck]
-fn valid_allocated_after_error(capacity: usize) -> bool {
-    let prealloc = [0usize; 1024];
-
+fn valid_allocated_after_error(prealloc: Vec<usize>, capacity: usize) -> bool {
+    let len = prealloc.len();
     let mut mem = PreAlloc::new(prealloc);
     let result = mem.alloc(capacity);
 
-    (if capacity <= 1024 {
+    (if capacity <= len {
         result.is_ok() && mem.allocated() == capacity
     } else {
         result.is_err() && mem.allocated() == 0
-    }) && mem.size_hint() >= 1024
+    }) && mem.size_hint() >= len
 }
