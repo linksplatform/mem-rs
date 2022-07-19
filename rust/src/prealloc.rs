@@ -9,7 +9,7 @@ pub struct PreAlloc<T, D> {
     marker: PhantomData<Box<[T]>>,
 }
 
-impl<T, D: AsMut<[T]>> PreAlloc<T, D> {
+impl<T, D> PreAlloc<T, D> {
     pub const fn new(data: D) -> Self {
         Self {
             data,
@@ -26,10 +26,10 @@ impl<T, D: AsMut<[T]> + AsRef<[T]>> RawMem<T> for PreAlloc<T, D> {
         let available = slice.len();
         slice
             .get_mut(0..capacity)
-            .map(|slice| {
+            // fixme: later use `tap_some` from `tap` crate
+            .inspect(|_| {
                 // set `allocated` if data is valid
-                self.allocated = available;
-                slice
+                self.allocated = capacity;
             })
             .ok_or(Error::OverAlloc {
                 available,

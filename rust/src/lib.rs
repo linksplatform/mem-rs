@@ -7,6 +7,7 @@
 #![feature(try_blocks)]
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
+#![feature(result_option_inspect)]
 
 pub use alloc::Alloc;
 pub use file_mapped::FileMapped;

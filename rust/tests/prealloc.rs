@@ -1,6 +1,7 @@
 #![feature(allocator_api)]
 
 use platform_mem::{PreAlloc, RawMem};
+use quickcheck_macros::quickcheck;
 use std::error::Error;
 
 #[test]
@@ -61,4 +62,18 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
         ]
     );
     Ok(())
+}
+
+#[quickcheck]
+fn valid_allocated_after_error(capacity: usize) -> bool {
+    let prealloc = [0usize; 1024];
+
+    let mut mem = PreAlloc::new(prealloc);
+    let result = mem.alloc(capacity);
+
+    (if capacity <= 1024 {
+        result.is_ok() && mem.allocated() == capacity
+    } else {
+        result.is_err() && mem.allocated() == 0
+    }) && mem.size_hint() >= 1024
 }
