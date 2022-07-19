@@ -1,12 +1,11 @@
-use std::{
-    alloc::{AllocError, LayoutError}, io,
-};
+use std::alloc::{AllocError, LayoutError};
 
 // Bare metal platforms usually have very small amounts of RAM
 // (in the order of hundreds of KB)
 #[rustfmt::skip]
 pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else { 8 * 1024 };
 
+// fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("invalid capacity to RawMem::alloc/occupy/grow/shrink")]
@@ -15,12 +14,12 @@ pub enum Error {
     OverAlloc { available: usize, to_alloc: usize },
     #[error("cannot occupy {to_occupy} - allocated only {allocated}")]
     OverOccupy { allocated: usize, to_occupy: usize },
-    #[error("{0}")]
+    #[error(transparent)]
     AllocError(#[from] AllocError),
-    #[error("{0}")]
+    #[error(transparent)]
     LayoutError(#[from] LayoutError),
-    #[error("{0}")]
-    System(#[from] io::Error),
+    #[error(transparent)]
+    System(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -32,39 +31,36 @@ pub trait RawMem<T> {
     fn occupy(&mut self, capacity: usize) -> Result<()>;
     fn occupied(&self) -> usize;
 
+    // fixme: maybe this should be return Option<usize> and None by default?
     fn size_hint(&self) -> usize {
         usize::MAX
     }
 
     fn grow(&mut self, capacity: usize) -> Result<&mut [T]> {
-        let res: Option<_> = try {
-            let to_alloc = self.allocated().checked_add(capacity)?;
-            self.alloc(to_alloc)
-        };
-        res.unwrap_or(Err(Error::CapacityOverflow))
+        self.allocated()
+            .checked_sub(capacity)
+            .ok_or(Error::CapacityOverflow)
+            .and_then(|capacity| self.alloc(capacity))
     }
 
     fn shrink(&mut self, capacity: usize) -> Result<&mut [T]> {
-        let res: Option<_> = try {
-            let to_alloc = self.allocated().checked_sub(capacity)?;
-            self.alloc(to_alloc)
-        };
-        res.unwrap_or(Err(Error::CapacityOverflow))
+        self.allocated()
+            .checked_sub(capacity)
+            .ok_or(Error::CapacityOverflow)
+            .and_then(|capacity| self.alloc(capacity))
     }
 
     fn grow_occupied(&mut self, capacity: usize) -> Result<()> {
-        let res: Option<_> = try {
-            let to_occupy = self.allocated().checked_add(capacity)?;
-            self.occupy(to_occupy)
-        };
-        res.unwrap_or(Err(Error::CapacityOverflow))
+        self.occupied()
+            .checked_add(capacity)
+            .ok_or(Error::CapacityOverflow)
+            .and_then(|capacity| self.occupy(capacity))
     }
 
     fn shrink_occupied(&mut self, capacity: usize) -> Result<()> {
-        let res: Option<_> = try {
-            let to_occupy = self.allocated().checked_sub(capacity)?;
-            self.occupy(to_occupy)
-        };
-        res.unwrap_or(Err(Error::CapacityOverflow))
+        self.occupied()
+            .checked_sub(capacity)
+            .ok_or(Error::CapacityOverflow)
+            .and_then(|capacity| self.occupy(capacity))
     }
 }
