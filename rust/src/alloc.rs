@@ -4,7 +4,7 @@ use std::{
     cmp::Ordering,
     mem::size_of,
     ptr,
-    ptr::{drop_in_place, NonNull},
+    ptr::NonNull,
 };
 
 pub struct Alloc<T, A: Allocator> {
@@ -18,10 +18,6 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
             base: Base::dangling(),
             alloc,
         }
-    }
-
-    unsafe fn handle_narrow(&mut self, capacity: usize) {
-        drop_in_place(&mut self.base.ptr.as_mut()[capacity..])
     }
 
     unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
@@ -39,7 +35,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
                 let ptr = internal::align_from(self.base.ptr);
                 match new_capacity.cmp(&old_capacity) {
                     Ordering::Less => {
-                        self.handle_narrow(new_capacity);
+                        self.base.handle_narrow(new_capacity);
                         self.alloc
                             .shrink(ptr.as_non_null_ptr(), old_layout, new_layout)?
                     }
@@ -54,9 +50,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
 
         result.map(|ptr| {
             self.base.ptr = internal::guaranteed_align_to(ptr);
-            for i in old_capacity..new_capacity {
-                self.base.ptr.as_mut_ptr().add(i).write(T::default());
-            }
+            self.base.handle_expand(old_capacity);
             self.base.ptr.as_mut()
         })
     }

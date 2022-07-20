@@ -2,7 +2,7 @@ use crate::{internal, Base, IsTrue, RawMem, Result};
 use std::{
     alloc::{self, Layout},
     mem::size_of,
-    ptr::{self, drop_in_place, NonNull},
+    ptr::{self, NonNull},
 };
 
 pub struct Global<T>(Base<T>);
@@ -15,10 +15,6 @@ impl<T> Global<T> {
     fn layout_impl(capacity: usize) -> Result<Layout> {
         Layout::array::<T>(capacity).map_err(Into::into)
     }
-
-    fn as_mut_slice(&mut self) -> &mut [T] {
-        unsafe { self.0.ptr.as_mut() }
-    }
 }
 
 impl<T: Default> Global<T> {
@@ -30,7 +26,7 @@ impl<T: Default> Global<T> {
             NonNull::slice_from_raw_parts(NonNull::new_unchecked(ptr), layout.size())
         } else {
             if new_capacity < old_capacity {
-                drop_in_place(&mut self.as_mut_slice()[new_capacity..])
+                self.0.handle_narrow(new_capacity);
             }
 
             let new_capacity = new_capacity * size_of::<T>();
@@ -41,9 +37,7 @@ impl<T: Default> Global<T> {
         };
 
         self.0.ptr = internal::guaranteed_align_to(ptr);
-        for i in old_capacity..new_capacity {
-            self.0.ptr.as_mut_ptr().add(i).write(T::default());
-        }
+        self.0.handle_expand(old_capacity);
         Ok(self.0.ptr.as_mut())
     }
 }

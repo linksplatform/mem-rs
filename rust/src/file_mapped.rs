@@ -47,16 +47,16 @@ impl<T: Default> FileMapped<T> {
     unsafe fn unmap(&mut self) {
         ManuallyDrop::drop(&mut self.mapping)
     }
+}
 
-    unsafe fn as_mut_slice(&mut self) -> &mut [T] {
-        self.base.ptr.as_mut()
-    }
-
+impl<T: Default> FileMapped<T> {
     fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
         let alloc_cap = capacity * size_of::<T>();
 
         if capacity < self.base.allocated() {
-            unsafe { drop_in_place(&mut self.as_mut_slice()[capacity..]) }
+            unsafe {
+                self.base.handle_narrow(capacity);
+            }
         }
 
         // SAFETY: `self.mapping` is initialized
@@ -67,10 +67,18 @@ impl<T: Default> FileMapped<T> {
         self.file.set_len(max(file_len, alloc_cap as u64))?;
 
         let bytes = unsafe { self.map(alloc_cap) }?;
+
         // SAFETY: type is safe to slice from bytes
         unsafe {
             self.base.ptr = NonNull::from(internal::guaranteed_align_slice(bytes));
         }
+
+        if capacity > self.base.allocated() {
+            unsafe {
+                self.base.handle_expand(capacity);
+            }
+        }
+
         Ok(())
     }
 }

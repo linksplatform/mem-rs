@@ -1,5 +1,5 @@
 use crate::{Error, Result, DEFAULT_PAGE_SIZE};
-use std::ptr::NonNull;
+use std::ptr::{drop_in_place, NonNull};
 
 pub(crate) struct Base<T> {
     pub ptr: NonNull<[T]>,
@@ -17,6 +17,10 @@ impl<T> Base<T> {
         Self::new(NonNull::slice_from_raw_parts(NonNull::dangling(), 0))
     }
 
+    pub unsafe fn handle_narrow(&mut self, capacity: usize) {
+        drop_in_place(&mut self.ptr.as_mut()[capacity..])
+    }
+
     pub fn allocated(&self) -> usize {
         self.ptr.len()
     }
@@ -31,6 +35,15 @@ impl<T> Base<T> {
                 allocated,
                 to_occupy: capacity,
             })
+        }
+    }
+}
+
+impl<T: Default> Base<T> {
+    pub unsafe fn handle_expand(&mut self, capacity: usize) {
+        let ptr = self.ptr.as_mut_ptr();
+        for i in capacity..self.allocated() {
+            ptr.add(i).write(T::default());
         }
     }
 }
