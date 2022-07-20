@@ -5,16 +5,16 @@ use std::{fs::File, io, path::Path};
 pub struct TempFile<T>(FileMapped<T>);
 
 impl<T: Default> TempFile<T> {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> io::Result<Self> {
         Self::from_file(tempfile::tempfile())
     }
 
-    pub fn new_in<P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn new_in<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         Self::from_file(tempfile::tempfile_in(path))
     }
 
-    fn from_file(file: io::Result<File>) -> Result<Self> {
-        file.and_then(FileMapped::new).map(Self).map_err(Into::into)
+    fn from_file(file: io::Result<File>) -> io::Result<Self> {
+        file.and_then(FileMapped::new).map(Self)
     }
 }
 
