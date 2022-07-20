@@ -36,7 +36,35 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The implementation of `RawMem` can allocate, increase, decrease one arbitrary block
-/// of elements of the same type
+/// of elements of the `T` type
+///
+/// Only one block can exist at time, so mut slice `&mut [T]` is returned to it
+///
+/// # Examples
+///
+/// Basic usage:
+///
+/// ```
+/// #![feature(allocator_api)]
+///
+/// use std::alloc::Global;
+/// use platform_mem::{RawMem, Alloc};
+///
+/// // `RawMem` when alloc memory via any `Allocator`
+/// let mut mem = Alloc::<usize, _>::new(Global);
+/// let slice = mem.alloc(10).unwrap();
+///
+/// slice.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+///
+/// // get new ref after realloc
+/// let slice = mem.grow(10).unwrap();
+/// assert_eq!(slice, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+///
+/// slice[0..5].reverse();
+///
+/// let slice = mem.shrink(15).unwrap();
+/// assert_eq!(slice, &[5, 4, 3, 2, 1]);
+/// ```
 pub trait RawMem<T> {
     /// Allocate or reserve a block of memory of the given `capacity`.
     /// If block is already allocated, it will be shrink or grow with data retention.
@@ -96,7 +124,7 @@ pub trait RawMem<T> {
     /// Returns error if the `allocated + capacity` overflowing
     fn grow(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.allocated()
-            .checked_sub(capacity)
+            .checked_add(capacity)
             .ok_or(Error::CapacityOverflow)
             .and_then(|capacity| self.alloc(capacity))
     }
