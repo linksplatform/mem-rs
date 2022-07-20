@@ -74,13 +74,13 @@ pub trait RawMem<T> {
     /// use std::cmp::min;
     /// use platform_mem::{PreAlloc, RawMem};
     ///
-    /// let mut pre_alloc = PreAlloc::new(vec![0; 100]);
+    /// let mut mem = PreAlloc::new(vec![0; 100]);
     ///
     /// let crazy_capacity = usize::MAX;
-    /// let _ = pre_alloc.alloc(crazy_capacity).unwrap_err();
+    /// let _ = mem.alloc(crazy_capacity).unwrap_err();
     ///
-    /// let smart_capacity = min(crazy_capacity, pre_alloc.size_hint());
-    /// let block = pre_alloc.alloc(smart_capacity).unwrap();
+    /// let smart_capacity = min(crazy_capacity, mem.size_hint());
+    /// let block = mem.alloc(smart_capacity).unwrap();
     ///
     /// assert_eq!(block.len(), 100);
     /// ```
