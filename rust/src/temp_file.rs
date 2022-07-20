@@ -1,5 +1,5 @@
-use crate::{FileMapped, RawMem, Result};
-use std::{fs::File, io, path::Path};
+use crate::{FileMapped, IsTrue, RawMem, Result};
+use std::{fs::File, io, mem::size_of, path::Path};
 
 #[repr(transparent)]
 pub struct TempFile<T>(FileMapped<T>);
@@ -18,7 +18,10 @@ impl<T: Default> TempFile<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for TempFile<T> {
+impl<T: Default> RawMem<T> for TempFile<T>
+where
+    (): IsTrue<{ size_of::<T>() != 0 }>,
+{
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.0.alloc(capacity)
     }

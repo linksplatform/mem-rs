@@ -1,13 +1,11 @@
 #![feature(allocator_api)]
 
-use platform_mem::{Alloc, RawMem};
-use std::{alloc::Global, error::Error};
+mod internal;
 
-#[test]
-fn basic() -> Result<(), Box<dyn Error>> {
-    let mut mem = Alloc::<usize, _>::new(Global);
+use platform_mem::{RawMem, Result};
+
+fn basic_impl(mut mem: impl RawMem<usize>) -> Result<()> {
     let slice = mem.alloc(10)?;
-
     assert_eq!(slice.len(), 10);
 
     slice.iter_mut().enumerate().for_each(|(i, x)| *x = i);
@@ -20,16 +18,16 @@ fn basic() -> Result<(), Box<dyn Error>> {
 
     assert_eq!(
         slice,
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+        ]
     );
+
     Ok(())
 }
 
-#[test]
-fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
-    let mut mem = Alloc::<String, _>::new(Global);
+fn non_default_inner_impl(mut mem: impl RawMem<String>) -> Result<()> {
     let slice = mem.alloc(10)?;
-    assert_eq!(slice.len(), 10);
 
     slice
         .iter_mut()
@@ -39,7 +37,6 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     assert_eq!(slice, ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
 
     let slice = mem.alloc(20)?;
-    assert_eq!(slice.len(), 20);
     slice
         .iter_mut()
         .enumerate()
@@ -52,5 +49,9 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
             "16", "17", "18", "19"
         ]
     );
+
     Ok(())
 }
+
+test_for_all_mem!(basic, basic_impl);
+test_for_all_mem!(non_default_inner, non_default_inner_impl);

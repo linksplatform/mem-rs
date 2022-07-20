@@ -1,13 +1,13 @@
-use crate::{internal, Base, RawMem, Result};
+use crate::{internal, Base, IsTrue, RawMem, Result};
 use std::{
     alloc::{self, Layout},
     mem::size_of,
-    ptr::{self, NonNull},
+    ptr::{self, drop_in_place, NonNull},
 };
 
 pub struct Global<T>(Base<T>);
 
-impl<T: Default> Global<T> {
+impl<T> Global<T> {
     pub const fn new() -> Self {
         Self(Base::dangling())
     }
@@ -16,6 +16,12 @@ impl<T: Default> Global<T> {
         Layout::array::<T>(capacity).map_err(Into::into)
     }
 
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        unsafe { self.0.ptr.as_mut() }
+    }
+}
+
+impl<T: Default> Global<T> {
     unsafe fn on_reserved_impl(&mut self, new_capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.0.allocated();
         let ptr = if self.0.ptr.as_non_null_ptr() == NonNull::dangling() {
@@ -23,6 +29,10 @@ impl<T: Default> Global<T> {
             let ptr = alloc::alloc_zeroed(layout);
             NonNull::slice_from_raw_parts(NonNull::new_unchecked(ptr), layout.size())
         } else {
+            if new_capacity < old_capacity {
+                drop_in_place(&mut self.as_mut_slice()[new_capacity..])
+            }
+
             let new_capacity = new_capacity * size_of::<T>();
             let ptr = internal::align_from(self.0.ptr);
             let layout = Self::layout_impl(old_capacity)?;
@@ -38,13 +48,16 @@ impl<T: Default> Global<T> {
     }
 }
 
-impl<T: Default> Default for Global<T> {
+impl<T: Default> const Default for Global<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Default> RawMem<T> for Global<T> {
+impl<T: Default> RawMem<T> for Global<T>
+where
+    (): IsTrue<{ size_of::<T>() != 0 }>,
+{
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.on_reserved_impl(capacity) }
     }
@@ -75,7 +88,7 @@ impl<T> Drop for Global<T> {
 
         let _: Result<_> = try {
             let ptr = self.0.ptr;
-            let layout = Layout::array::<T>(ptr.len())?;
+            let layout = Self::layout_impl(ptr.len())?;
             // SAFETY: ptr is valid slice
             unsafe {
                 let ptr = ptr.as_non_null_ptr().cast();

@@ -1,4 +1,4 @@
-use crate::{base::Base, internal, RawMem, Result};
+use crate::{base::Base, internal, IsTrue, RawMem, Result};
 use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,
@@ -6,9 +6,9 @@ use std::{
     io,
     mem::{size_of, ManuallyDrop},
     path::Path,
-    ptr,
-    ptr::NonNull,
+    ptr::{drop_in_place, NonNull},
 };
+use tap::Pipe;
 
 pub struct FileMapped<T> {
     base: Base<T>,
@@ -21,13 +21,12 @@ impl<T: Default> FileMapped<T> {
         let capacity = Base::<T>::MIN_CAPACITY / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
-        let mut new = Self {
+        Self {
             base: Base::dangling(),
             mapping: ManuallyDrop::new(mapping),
             file,
-        };
-
-        new.alloc_impl(capacity).map(|_| new)
+        }
+        .pipe(|new| new.file.set_len(capacity as u64).map(|_| new))
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
@@ -49,8 +48,16 @@ impl<T: Default> FileMapped<T> {
         ManuallyDrop::drop(&mut self.mapping)
     }
 
+    unsafe fn as_mut_slice(&mut self) -> &mut [T] {
+        self.base.ptr.as_mut()
+    }
+
     fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
         let alloc_cap = capacity * size_of::<T>();
+
+        if capacity < self.base.allocated() {
+            unsafe { drop_in_place(&mut self.as_mut_slice()[capacity..]) }
+        }
 
         // SAFETY: `self.mapping` is initialized
         unsafe {
@@ -68,7 +75,10 @@ impl<T: Default> FileMapped<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for FileMapped<T> {
+impl<T: Default> RawMem<T> for FileMapped<T>
+where
+    (): IsTrue<{ size_of::<T>() != 0 }>,
+{
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.alloc_impl(capacity)?;
 
@@ -92,15 +102,12 @@ impl<T: Default> RawMem<T> for FileMapped<T> {
 impl<T> Drop for FileMapped<T> {
     fn drop(&mut self) {
         // SAFETY: `slice` is valid file piece
-        // SAFETY: items is friendly to drop
+        // items is friendly to drop
         unsafe {
             let ptr = self.base.ptr;
             let mut ptr =
                 NonNull::slice_from_raw_parts(ptr.as_non_null_ptr(), self.base.allocated());
-            let slice = ptr.as_mut();
-            for item in slice {
-                ptr::drop_in_place(item);
-            }
+            drop_in_place(ptr.as_mut());
         }
 
         // SAFETY: `self.mapping` is initialized

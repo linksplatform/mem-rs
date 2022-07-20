@@ -1,5 +1,6 @@
 use crate::{Error, RawMem, Result};
 use std::marker::PhantomData;
+use tap::TapOptional;
 
 pub struct PreAlloc<T, D> {
     data: D,
@@ -26,8 +27,8 @@ impl<T, D: AsMut<[T]> + AsRef<[T]>> RawMem<T> for PreAlloc<T, D> {
         let available = slice.len();
         slice
             .get_mut(0..capacity)
-            // fixme: later use `tap_some` from `tap` crate
-            .inspect(|_| {
+            // equivalent `Some::inspect` but stable and has more logic name than `inspect`
+            .tap_some(|_| {
                 // set `allocated` if data is valid
                 self.allocated = capacity;
             })

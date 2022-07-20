@@ -1,9 +1,10 @@
-use crate::{base::Base, internal, RawMem, Result};
+use crate::{base::Base, internal, IsTrue, RawMem, Result};
 use std::{
     alloc::{Allocator, Layout},
     cmp::Ordering,
+    mem::size_of,
     ptr,
-    ptr::NonNull,
+    ptr::{drop_in_place, NonNull},
 };
 
 pub struct Alloc<T, A: Allocator> {
@@ -19,6 +20,10 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         }
     }
 
+    unsafe fn handle_narrow(&mut self, capacity: usize) {
+        drop_in_place(&mut self.base.ptr.as_mut()[capacity..])
+    }
+
     unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.base.ptr.len();
         let new_capacity = capacity;
@@ -32,14 +37,15 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
                 let new_layout = Layout::array::<T>(new_capacity)?;
 
                 let ptr = internal::align_from(self.base.ptr);
-                match old_capacity.cmp(&new_capacity) {
+                match new_capacity.cmp(&old_capacity) {
                     Ordering::Less => {
+                        self.handle_narrow(new_capacity);
                         self.alloc
-                            .grow_zeroed(ptr.as_non_null_ptr(), old_layout, new_layout)?
+                            .shrink(ptr.as_non_null_ptr(), old_layout, new_layout)?
                     }
                     Ordering::Greater => {
                         self.alloc
-                            .shrink(ptr.as_non_null_ptr(), old_layout, new_layout)?
+                            .grow(ptr.as_non_null_ptr(), old_layout, new_layout)?
                     }
                     Ordering::Equal => ptr,
                 }
@@ -56,7 +62,10 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
     }
 }
 
-impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A> {
+impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A>
+where
+    (): IsTrue<{ size_of::<T>() != 0 }>,
+{
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.alloc_impl(capacity) }
     }

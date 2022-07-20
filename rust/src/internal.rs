@@ -5,19 +5,36 @@ pub fn align_from<T>(ptr: NonNull<[T]>) -> NonNull<[u8]> {
 }
 
 pub fn guaranteed_align_to<U>(ptr: NonNull<[u8]>) -> NonNull<[U]> {
-    debug_assert!(ptr.len() % size_of::<U>() == 0, "Types are not aligned");
+    let size_of = size_of::<U>();
+    if size_of != 0 {
+        debug_assert!(ptr.len() % size_of == 0, "Types are not aligned");
+    }
 
-    NonNull::slice_from_raw_parts(ptr.as_non_null_ptr().cast(), ptr.len() / size_of::<U>())
+    NonNull::slice_from_raw_parts(
+        ptr.as_non_null_ptr().cast(),
+        ptr.len() / if size_of == 0 { 1 } else { size_of },
+    )
 }
 
+// for more explicit unsafe zones
+#[allow(unused_unsafe)]
 pub unsafe fn guaranteed_align_slice<U>(bytes: &mut [u8]) -> &mut [U] {
-    debug_assert!(bytes.len() % size_of::<U>() == 0, "Types are not aligned");
+    let size_of = size_of::<U>();
+    if size_of != 0 {
+        debug_assert!(bytes.len() % size_of == 0, "Types are not aligned");
+    }
 
-    let (a, slice, b) = bytes.align_to_mut();
-    debug_assert!(a.is_empty());
-    debug_assert!(b.is_empty());
+    // SAFETY: Caller must guarantee that transmute<u8, U> no has side effects.
+    let (a, slice, b) = unsafe { bytes.align_to_mut() };
+    assert!(a.is_empty());
+    assert!(b.is_empty());
     slice
 }
+
+// to constraint `RawMem` implementations
+pub trait IsTrue<const COND: bool> {}
+
+impl IsTrue<true> for () {}
 
 #[cfg(test)]
 mod quick_tests {

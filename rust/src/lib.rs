@@ -7,7 +7,9 @@
 #![feature(try_blocks)]
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
-#![feature(result_option_inspect)]
+#![feature(const_trait_impl)]
+#![feature(generic_const_exprs)]
+#![allow(incomplete_features)]
 
 pub use alloc::Alloc;
 pub use file_mapped::FileMapped;
@@ -26,3 +28,4 @@ mod temp_file;
 mod traits;
 
 pub(crate) use base::Base;
+pub(crate) use internal::IsTrue;
