@@ -68,12 +68,43 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait RawMem<T> {
     /// Allocate or reserve a block of memory of the given `capacity`.
     /// If block is already allocated, it will be shrink or grow with data retention.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// // alloc mem via `std::alloc`
+    /// use platform_mem::{RawMem, Global};
+    ///
+    /// let mut mem = Global::<usize>::new();
+    ///
+    /// let slice = mem.alloc(10).unwrap();
+    /// assert_eq!(slice.len(), 10);
+    ///
+    /// let slice = mem.alloc(20).unwrap();
+    /// assert_eq!(slice.len(), 20);
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]>;
+
     /// Current allocated elements count. Must be equal `alloc` result length.
+    ///
+    /// # Examples
+    ///
+    /// Basic usage:
+    ///
+    /// ```
+    /// use platform_mem::{RawMem, Global};
+    ///
+    /// let mut mem = Global::<usize>::new();
+    ///
+    /// let slice = mem.alloc(10).unwrap();
+    /// assert_eq!(slice.len(), mem.allocated());
+    /// ```
     fn allocated(&self) -> usize;
 
     /// Occupy a block of memory of the given `capacity`.
     fn occupy(&mut self, capacity: usize) -> Result<()>;
+
     /// Current occupied elements count.
     fn occupied(&self) -> usize;
 
