@@ -42,22 +42,6 @@ impl<T, D: AsMut<[T]> + AsRef<[T]>> RawMem<T> for PreAlloc<T, D> {
         self.allocated
     }
 
-    fn occupy(&mut self, capacity: usize) -> Result<()> {
-        if capacity > self.allocated {
-            Err(Error::OverOccupy {
-                allocated: self.allocated,
-                to_occupy: capacity,
-            })
-        } else {
-            self.occupied = capacity;
-            Ok(())
-        }
-    }
-
-    fn occupied(&self) -> usize {
-        self.occupied
-    }
-
     fn size_hint(&self) -> usize {
         self.data.as_ref().len()
     }

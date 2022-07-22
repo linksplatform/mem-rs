@@ -13,14 +13,33 @@ pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else 
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `usize::MAX` bytes).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use platform_mem::{Error, Global, RawMem};
+    ///
+    /// let mut mem = Global::<usize>::new();
+    ///
+    /// let _ = mem.alloc(128);
+    ///
+    /// assert!(matches!(mem.grow(usize::MAX), Err(Error::CapacityOverflow)));
+    /// assert!(matches!(mem.shrink(usize::MAX), Err(Error::CapacityOverflow)));
+    /// ```
     #[error("invalid capacity to RawMem::alloc/occupy/grow/shrink")]
     CapacityOverflow,
     /// Cannot to `allocate` more than `available`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use platform_mem::{Error, PreAlloc, RawMem};
+    ///
+    /// let mut mem = PreAlloc::new(vec![0_usize; 64]);
+    ///
+    /// assert!(matches!(mem.alloc(128), Err(Error::OverAlloc { available: 64, to_alloc: 128 })));
     #[error("cannot allocate {to_alloc} - available only {available}")]
     OverAlloc { available: usize, to_alloc: usize },
-    /// Cannot to `occupy` more than `allocated`
-    #[error("cannot occupy {to_occupy} - allocated only {allocated}")]
-    OverOccupy { allocated: usize, to_occupy: usize },
     /// Memory allocator return an error
     #[error(transparent)]
     AllocError(#[from] AllocError),
@@ -102,12 +121,6 @@ pub trait RawMem<T> {
     /// ```
     fn allocated(&self) -> usize;
 
-    /// Occupy a block of memory of the given `capacity`.
-    fn occupy(&mut self, capacity: usize) -> Result<()>;
-
-    /// Current occupied elements count.
-    fn occupied(&self) -> usize;
-
     /// Returns the boundary (in count of elements) on the available elements.
     ///
     /// A [`usize::MAX`] here means that `RawMem` can allocate memory indefinitely
@@ -170,30 +183,5 @@ pub trait RawMem<T> {
             .checked_sub(capacity)
             .ok_or(Error::CapacityOverflow)
             .and_then(|capacity| self.alloc(capacity))
-    }
-
-    /// Attempts to grow occupied memory.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the occupied memory is already at the upper bound
-    /// (that is, when `occupied + capacity` is great than `allocated` or overflowing).
-    fn grow_occupied(&mut self, capacity: usize) -> Result<()> {
-        self.occupied()
-            .checked_add(capacity)
-            .ok_or(Error::CapacityOverflow)
-            .and_then(|capacity| self.occupy(capacity))
-    }
-
-    /// Attempts to shrink occupied memory.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the occupied memory is less than `capacity` (that is, when overflowing).
-    fn shrink_occupied(&mut self, capacity: usize) -> Result<()> {
-        self.occupied()
-            .checked_sub(capacity)
-            .ok_or(Error::CapacityOverflow)
-            .and_then(|capacity| self.occupy(capacity))
     }
 }

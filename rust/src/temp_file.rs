@@ -30,11 +30,5 @@ where
         self.0.allocated()
     }
 
-    fn occupy(&mut self, capacity: usize) -> Result<()> {
-        self.0.occupy(capacity)
-    }
-
-    fn occupied(&self) -> usize {
-        self.0.occupied()
-    }
+    // fixme: delegate all functions from `FileMapped`
 }

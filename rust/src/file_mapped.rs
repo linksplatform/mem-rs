@@ -97,14 +97,6 @@ where
     fn allocated(&self) -> usize {
         self.base.allocated()
     }
-
-    fn occupy(&mut self, capacity: usize) -> Result<()> {
-        self.base.occupy(capacity)
-    }
-
-    fn occupied(&self) -> usize {
-        self.base.occupied
-    }
 }
 
 impl<T> Drop for FileMapped<T> {

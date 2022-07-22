@@ -24,19 +24,6 @@ impl<T> Base<T> {
     pub fn allocated(&self) -> usize {
         self.ptr.len()
     }
-
-    pub fn occupy(&mut self, capacity: usize) -> Result<()> {
-        let allocated = self.allocated();
-        if capacity <= allocated {
-            self.occupied = capacity;
-            Ok(())
-        } else {
-            Err(Error::OverOccupy {
-                allocated,
-                to_occupy: capacity,
-            })
-        }
-    }
 }
 
 impl<T: Default> Base<T> {

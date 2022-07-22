@@ -59,14 +59,6 @@ where
     fn allocated(&self) -> usize {
         self.0.allocated()
     }
-
-    fn occupy(&mut self, capacity: usize) -> Result<()> {
-        self.0.occupy(capacity)
-    }
-
-    fn occupied(&self) -> usize {
-        self.0.occupied
-    }
 }
 
 impl<T> Drop for Global<T> {
