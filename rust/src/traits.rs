@@ -14,7 +14,9 @@ pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `usize::MAX` bytes).
     ///
-    /// # Example
+    /// # Examples
+    ///
+    /// try grow/shrink more than `usize::MAX` bytes:
     ///
     /// ```
     /// use platform_mem::{Error, Global, RawMem};
@@ -30,7 +32,9 @@ pub enum Error {
     CapacityOverflow,
     /// Cannot to `allocate` more than `available`
     ///
-    /// # Example
+    /// # Examples
+    ///
+    /// try to allocate more than `available` elements:
     ///
     /// ```
     /// use platform_mem::{Error, PreAlloc, RawMem};
