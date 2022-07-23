@@ -6,17 +6,25 @@ use std::{
     io,
     mem::{size_of, ManuallyDrop},
     path::Path,
-    ptr::{drop_in_place, NonNull},
+    ptr::drop_in_place,
 };
 use tap::Pipe;
 
+/// [`RawMem`] that uses mapped file as space for a block of memory. It can change the file size
 pub struct FileMapped<T> {
     base: Base<T>,
     pub(crate) file: File,
-    mapping: ManuallyDrop<MmapMut>, // TODO: `MaybeUninit`
+    mapping: ManuallyDrop<MmapMut>,
 }
 
 impl<T: Default> FileMapped<T> {
+    /// Constructs a new `FileMapped` with provided file.
+    /// File must be opened in read-write mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file is not opened in read-write mode
+    /// or it captured by other process.
     pub fn new(file: File) -> io::Result<Self> {
         let capacity = Base::<T>::MIN_CAPACITY / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
@@ -39,9 +47,11 @@ impl<T: Default> FileMapped<T> {
     }
 
     unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
-        let mapping = MmapOptions::new().len(capacity).map_mut(&self.file)?;
-        self.mapping = ManuallyDrop::new(mapping);
-        Ok(self.mapping.as_mut())
+        self.mapping = MmapOptions::new()
+            .len(capacity)
+            .map_mut(&self.file)?
+            .pipe(ManuallyDrop::new);
+        self.mapping.as_mut().pipe(Ok)
     }
 
     unsafe fn unmap(&mut self) {
@@ -51,7 +61,7 @@ impl<T: Default> FileMapped<T> {
 
 impl<T: Default> FileMapped<T> {
     fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
-        let alloc_cap = capacity * size_of::<T>();
+        let cap = capacity * size_of::<T>();
 
         if capacity < self.base.allocated() {
             unsafe {
@@ -63,14 +73,19 @@ impl<T: Default> FileMapped<T> {
         unsafe {
             self.unmap();
         }
-        let file_len = self.file.metadata()?.len();
-        self.file.set_len(max(file_len, alloc_cap as u64))?;
 
-        let bytes = unsafe { self.map(alloc_cap) }?;
+        self.file
+            .metadata()?
+            .len()
+            .pipe(|len| max(len, cap as u64))
+            .pipe(|len| self.file.set_len(len))?;
 
         // SAFETY: type is safe to slice from bytes
         unsafe {
-            self.base.ptr = NonNull::from(internal::guaranteed_align_slice(bytes));
+            self.base.ptr = self
+                .map(cap)?
+                .pipe(internal::safety_from_bytes_slice)
+                .into()
         }
 
         if capacity > self.base.allocated() {
@@ -91,7 +106,7 @@ where
         self.alloc_impl(capacity)?;
 
         // SAFETY: `ptr` is valid slice
-        unsafe { Ok(self.base.ptr.as_mut()) }
+        unsafe { self.base.ptr.as_mut().pipe(Ok) }
     }
 
     fn allocated(&self) -> usize {
@@ -102,16 +117,10 @@ where
 impl<T> Drop for FileMapped<T> {
     fn drop(&mut self) {
         // SAFETY: `slice` is valid file piece
+        // `self.mapping` is initialized
         // items is friendly to drop
         unsafe {
-            let ptr = self.base.ptr;
-            let mut ptr =
-                NonNull::slice_from_raw_parts(ptr.as_non_null_ptr(), self.base.allocated());
-            drop_in_place(ptr.as_mut());
-        }
-
-        // SAFETY: `self.mapping` is initialized
-        unsafe {
+            drop_in_place(self.mapping.as_mut());
             ManuallyDrop::drop(&mut self.mapping);
         }
 

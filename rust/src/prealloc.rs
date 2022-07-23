@@ -4,7 +4,6 @@ use tap::TapOptional;
 
 pub struct PreAlloc<T, D> {
     data: D,
-    occupied: usize,
     allocated: usize,
     // mark Self as owned of Sized `[T]`
     marker: PhantomData<Box<[T]>>,
@@ -14,7 +13,6 @@ impl<T, D> PreAlloc<T, D> {
     pub const fn new(data: D) -> Self {
         Self {
             data,
-            occupied: 0,
             allocated: 0,
             marker: PhantomData,
         }

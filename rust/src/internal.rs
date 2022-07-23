@@ -1,18 +1,23 @@
 use std::{mem::size_of, ptr::NonNull};
 
-pub fn align_from<T>(ptr: NonNull<[T]>) -> NonNull<[u8]> {
+pub fn to_bytes<T>(ptr: NonNull<[T]>) -> NonNull<[u8]> {
     NonNull::slice_from_raw_parts(ptr.as_non_null_ptr().cast(), ptr.len() * size_of::<T>())
 }
 
-pub fn guaranteed_align_to<U>(ptr: NonNull<[u8]>) -> NonNull<[U]> {
-    debug_assert!(ptr.len() % size_of::<U>() == 0, "Types are not aligned");
+pub fn guaranteed_from_bytes<U>(ptr: NonNull<[u8]>) -> NonNull<[U]> {
+    debug_assert!(
+        ptr.len() % size_of::<U>() == 0,
+        "Types are not aligned; len: {}, size_of: {}",
+        ptr.len(),
+        size_of::<U>()
+    );
 
     NonNull::slice_from_raw_parts(ptr.as_non_null_ptr().cast(), ptr.len() / size_of::<U>())
 }
 
 // for more explicit unsafe zones
 #[allow(unused_unsafe)]
-pub unsafe fn guaranteed_align_slice<U>(bytes: &mut [u8]) -> &mut [U] {
+pub unsafe fn from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
     debug_assert!(bytes.len() % size_of::<U>() == 0, "Types are not aligned");
 
     // SAFETY: Caller must guarantee that transmute<u8, U> no has side effects.
@@ -20,6 +25,13 @@ pub unsafe fn guaranteed_align_slice<U>(bytes: &mut [u8]) -> &mut [U] {
     assert!(a.is_empty());
     assert!(b.is_empty());
     slice
+}
+
+// UNSAFE
+// wrapper for `.pipe` function
+pub(crate) fn safety_from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
+    // SAFETY: guaranteed by caller so used only in crate
+    unsafe { from_bytes_slice::<U>(bytes) }
 }
 
 // to constraint `RawMem` implementations
@@ -38,7 +50,7 @@ mod quick_tests {
         let slice = data.as_slice();
         let ptr = NonNull::from(slice);
 
-        let new_ptr: NonNull<_> = guaranteed_align_to(align_from(ptr));
+        let new_ptr: NonNull<_> = guaranteed_from_bytes(to_bytes(ptr));
 
         let new_slice = unsafe { ptr.as_ref() };
         ptr == new_ptr && slice == new_slice
@@ -49,7 +61,7 @@ mod quick_tests {
         let cloned = data.clone();
         let slice = data.as_mut_slice();
 
-        let new_slice: &[u8] = unsafe { guaranteed_align_slice(slice) };
+        let new_slice: &[u8] = unsafe { from_bytes_slice(slice) };
         new_slice == cloned.as_slice()
     }
 }

@@ -3,9 +3,9 @@ use std::{
     alloc::{Allocator, Layout},
     cmp::Ordering,
     mem::size_of,
-    ptr,
-    ptr::NonNull,
+    ptr::{drop_in_place, NonNull},
 };
+use tap::Pipe;
 
 pub struct Alloc<T, A: Allocator> {
     base: Base<T>,
@@ -32,7 +32,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
                 let old_layout = Layout::array::<T>(old_capacity)?;
                 let new_layout = Layout::array::<T>(new_capacity)?;
 
-                let ptr = internal::align_from(self.base.ptr);
+                let ptr = internal::to_bytes(self.base.ptr);
                 match new_capacity.cmp(&old_capacity) {
                     Ordering::Less => {
                         self.base.handle_narrow(new_capacity);
@@ -49,7 +49,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         };
 
         result.map(|ptr| {
-            self.base.ptr = internal::guaranteed_align_to(ptr);
+            self.base.ptr = internal::guaranteed_from_bytes(ptr);
             self.base.handle_expand(old_capacity);
             self.base.ptr.as_mut()
         })
@@ -73,12 +73,7 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
         // SAFETY: ptr is valid slice
         // SAFETY: items is friendly to drop
-        unsafe {
-            let slice = self.base.ptr.as_mut();
-            for item in slice {
-                ptr::drop_in_place(item);
-            }
-        }
+        unsafe { self.base.ptr.as_mut().pipe(|slice| drop_in_place(slice)) }
 
         let _: Result<_> = try {
             let ptr = self.base.ptr;
