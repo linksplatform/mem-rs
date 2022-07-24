@@ -30,7 +30,8 @@ pub unsafe fn from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
 // UNSAFE
 // wrapper for `.pipe` function
 pub(crate) fn safety_from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
-    // SAFETY: guaranteed by caller so used only in crate
+    // SAFETY: the safety contract for `self::from_bytes_slice` must
+    // be upheld by the caller.
     unsafe { from_bytes_slice::<U>(bytes) }
 }
 
