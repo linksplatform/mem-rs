@@ -1,4 +1,4 @@
-use crate::{base::Base, internal, IsTrue, RawMem, Result};
+use crate::{base::Base, internal, IsTrue, RawMem, Result, DEFAULT_PAGE_SIZE};
 use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,
@@ -21,12 +21,22 @@ impl<T: Default> FileMapped<T> {
     /// Constructs a new `FileMapped` with provided file.
     /// File must be opened in read-write mode.
     ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::{fs::File, io};
+    /// use platform_mem::FileMapped;
+    ///
+    /// let file = File::options().read(true).write(true).open("file").unwrap();
+    /// let mut mem: io::Result<FileMapped<usize>> = FileMapped::new(file);
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns error if file is not opened in read-write mode
     /// or it captured by other process.
     pub fn new(file: File) -> io::Result<Self> {
-        let capacity = Base::<T>::MIN_CAPACITY / size_of::<T>();
+        let capacity = DEFAULT_PAGE_SIZE / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
         Self {
@@ -37,6 +47,21 @@ impl<T: Default> FileMapped<T> {
         .pipe(|new| new.file.set_len(capacity as u64).map(|_| new))
     }
 
+    /// Constructs a new `FileMapped` with provided file,
+    /// when open as read/write mode.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use std::io;
+    /// use platform_mem::FileMapped;
+    ///
+    /// let mut mem: io::Result<FileMapped<usize>> = FileMapped::from_path("file");
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns error if file is captured by other process.
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         File::options()
             .create(true)

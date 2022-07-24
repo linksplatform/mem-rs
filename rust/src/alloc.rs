@@ -27,7 +27,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         let result: Result<_> = try {
             if self.base.ptr.as_non_null_ptr() == NonNull::dangling() {
                 let layout = Layout::array::<T>(capacity)?;
-                self.alloc.allocate_zeroed(layout)?
+                self.alloc.allocate(layout)?
             } else {
                 let old_layout = Layout::array::<T>(old_capacity)?;
                 let new_layout = Layout::array::<T>(new_capacity)?;

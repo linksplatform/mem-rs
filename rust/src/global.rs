@@ -23,22 +23,17 @@ impl<T: Default> Global<T> {
         let old_capacity = self.0.allocated();
         let new_in_bytes = new_capacity * size_of::<T>();
         let ptr = if self.0.ptr.as_non_null_ptr() == NonNull::dangling() {
-            Self::layout_impl(new_capacity)?
-                .pipe(|layout| alloc::alloc(layout))
-                .pipe(|ptr| NonNull::new_unchecked(ptr))
-                .pipe(|ptr| NonNull::slice_from_raw_parts(ptr, new_in_bytes))
+            Self::layout_impl(new_capacity)?.pipe(|layout| alloc::alloc(layout))
         } else {
             if new_capacity < old_capacity {
                 self.0.handle_narrow(new_capacity);
             }
-
             let ptr = internal::to_bytes(self.0.ptr).as_mut_ptr();
-            let layout = Self::layout_impl(old_capacity)?;
-
-            alloc::realloc(ptr, layout, new_in_bytes)
-                .pipe(|ptr| NonNull::new_unchecked(ptr))
-                .pipe(|ptr| NonNull::slice_from_raw_parts(ptr, new_in_bytes))
-        };
+            Self::layout_impl(old_capacity)?
+                .pipe(|layout| alloc::realloc(ptr, layout, new_in_bytes))
+        }
+        .pipe(|ptr| NonNull::new_unchecked(ptr))
+        .pipe(|ptr| NonNull::slice_from_raw_parts(ptr, new_in_bytes));
 
         self.0.ptr = internal::guaranteed_from_bytes(ptr);
         self.0.handle_expand(old_capacity);

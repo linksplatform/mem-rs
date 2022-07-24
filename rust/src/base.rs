@@ -1,4 +1,3 @@
-use crate::DEFAULT_PAGE_SIZE;
 use std::ptr::{drop_in_place, NonNull};
 
 pub(crate) struct Base<T> {
@@ -6,8 +5,6 @@ pub(crate) struct Base<T> {
 }
 
 impl<T> Base<T> {
-    pub const MIN_CAPACITY: usize = DEFAULT_PAGE_SIZE;
-
     pub const fn new(ptr: NonNull<[T]>) -> Self {
         Self { ptr }
     }
@@ -20,7 +17,7 @@ impl<T> Base<T> {
         drop_in_place(&mut self.ptr.as_mut()[capacity..])
     }
 
-    pub fn allocated(&self) -> usize {
+    pub const fn allocated(&self) -> usize {
         self.ptr.len()
     }
 }
