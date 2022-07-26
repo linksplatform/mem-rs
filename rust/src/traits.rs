@@ -45,9 +45,15 @@ pub enum Error {
     #[error("cannot allocate {to_alloc} - available only {available}")]
     OverAlloc { available: usize, to_alloc: usize },
     /// Memory allocator return an error
+    /// This error won't happen,
+    /// but it may reveal buggy `RawMem` implementation.
     #[error(transparent)]
     AllocError(#[from] AllocError),
-    /// Memory allocator accept incorrect [`Layout`](std::alloc::Layout)
+    /// Memory allocator accept incorrect [`Layout`]
+    /// This error won't happen,
+    /// but it may reveal buggy `RawMem` implementation.
+    ///
+    /// [`Layout`]: std::alloc::Layout
     #[error(transparent)]
     LayoutError(#[from] LayoutError),
     /// System error memory allocation occurred
@@ -55,7 +61,7 @@ pub enum Error {
     System(#[from] std::io::Error),
 }
 
-/// Alias for `Result<T, Error>`.
+/// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// The implementation of `RawMem` can allocate, increase, decrease one arbitrary block

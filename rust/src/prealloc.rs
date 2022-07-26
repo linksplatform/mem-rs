@@ -1,7 +1,11 @@
+use std::borrow::BorrowMut;
 use crate::{Error, RawMem, Result};
 use std::marker::PhantomData;
+use std::ops::Deref;
 use tap::TapOptional;
 
+/// [`RawMem`] that own any type that provides refs to memory block
+/// (<code>[`AsMut<[T]>`] + [`AsRef<[T]>`]</code>)
 pub struct PreAlloc<T, D> {
     data: D,
     allocated: usize,
@@ -10,7 +14,10 @@ pub struct PreAlloc<T, D> {
 }
 
 impl<T, D> PreAlloc<T, D> {
+    /// Constructs new `PreAlloc`
     pub const fn new(data: D) -> Self {
+        AsRef::as_ref()
+        <Vec<u32> as Deref>
         Self {
             data,
             allocated: 0,
