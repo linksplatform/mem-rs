@@ -1,12 +1,21 @@
-use std::ptr::{drop_in_place, NonNull};
+use std::{
+    marker::PhantomData,
+    ptr::{drop_in_place, NonNull},
+};
 
 pub(crate) struct Base<T> {
+    // fixme: use `Unique`
     pub ptr: NonNull<[T]>,
+    // for dropck: `RawMem` usually owns `T`
+    marker: PhantomData<T>,
 }
 
 impl<T> Base<T> {
     pub const fn new(ptr: NonNull<[T]>) -> Self {
-        Self { ptr }
+        Self {
+            ptr,
+            marker: PhantomData,
+        }
     }
 
     pub const fn dangling() -> Self {

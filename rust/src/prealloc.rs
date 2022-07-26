@@ -1,7 +1,5 @@
-use std::borrow::BorrowMut;
 use crate::{Error, RawMem, Result};
-use std::marker::PhantomData;
-use std::ops::Deref;
+use std::{borrow::BorrowMut, marker::PhantomData, ops::Deref};
 use tap::TapOptional;
 
 /// [`RawMem`] that own any type that provides refs to memory block
@@ -9,15 +7,14 @@ use tap::TapOptional;
 pub struct PreAlloc<T, D> {
     data: D,
     allocated: usize,
-    // mark Self as owned of Sized `[T]`
-    marker: PhantomData<Box<[T]>>,
+    // unlike other implementations dropck escape-hatch store in `D`
+    // but `T` is unused :)
+    marker: PhantomData<T>,
 }
 
 impl<T, D> PreAlloc<T, D> {
     /// Constructs new `PreAlloc`
     pub const fn new(data: D) -> Self {
-        AsRef::as_ref()
-        <Vec<u32> as Deref>
         Self {
             data,
             allocated: 0,
