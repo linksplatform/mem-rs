@@ -8,8 +8,6 @@
 #![feature(slice_ptr_len)]
 #![feature(io_error_other)]
 #![feature(const_trait_impl)]
-#![feature(generic_const_exprs)]
-#![allow(incomplete_features)]
 
 pub use alloc::Alloc;
 pub use file_mapped::FileMapped;

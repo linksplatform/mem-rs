@@ -57,8 +57,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
 }
 
 impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A>
-where
-    (): IsTrue<{ size_of::<T>() != 0 }>,
+
 {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.alloc_impl(capacity) }

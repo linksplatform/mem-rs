@@ -124,8 +124,7 @@ impl<T: Default> FileMapped<T> {
 }
 
 impl<T: Default> RawMem<T> for FileMapped<T>
-where
-    (): IsTrue<{ size_of::<T>() != 0 }>,
+
 {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.alloc_impl(capacity)?;

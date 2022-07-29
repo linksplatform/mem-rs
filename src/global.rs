@@ -48,8 +48,7 @@ impl<T: Default> const Default for Global<T> {
 }
 
 impl<T: Default> RawMem<T> for Global<T>
-where
-    (): IsTrue<{ size_of::<T>() != 0 }>,
+
 {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.on_reserved_impl(capacity) }
