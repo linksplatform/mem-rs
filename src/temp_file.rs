@@ -21,9 +21,7 @@ impl<T: Default> TempFile<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for TempFile<T>
-
-{
+impl<T: Default> RawMem<T> for TempFile<T> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.0.alloc(capacity)
     }

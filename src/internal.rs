@@ -40,7 +40,7 @@ pub trait IsTrue<const COND: bool> {}
 
 impl IsTrue<true> for () {}
 
-#[cfg(test)]
+#[cfg(all(test, not(miri)))]
 mod quick_tests {
     use super::*;
     use quickcheck_macros::quickcheck;

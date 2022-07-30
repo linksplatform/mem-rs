@@ -39,12 +39,16 @@ impl<T: Default> FileMapped<T> {
         let capacity = DEFAULT_PAGE_SIZE / size_of::<T>();
         let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
 
-        Self {
-            base: Base::dangling(),
-            mapping: ManuallyDrop::new(mapping),
-            file,
-        }
-        .pipe(|new| new.file.set_len(capacity as u64).map(|_| new))
+        file.metadata()?
+            .len()
+            .pipe(|len| max(len, capacity as u64))
+            .pipe(|len| file.set_len(len))
+            .pipe(|_| Self {
+                base: Base::dangling(),
+                mapping: ManuallyDrop::new(mapping),
+                file,
+            })
+            .pipe(Ok)
     }
 
     /// Constructs a new `FileMapped` with provided file,
@@ -123,9 +127,7 @@ impl<T: Default> FileMapped<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for FileMapped<T>
-
-{
+impl<T: Default> RawMem<T> for FileMapped<T> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.alloc_impl(capacity)?;
 
@@ -144,7 +146,7 @@ impl<T> Drop for FileMapped<T> {
         // `self.mapping` is initialized
         // items is friendly to drop
         unsafe {
-            drop_in_place(self.mapping.as_mut());
+            drop_in_place(self.base.ptr.as_mut());
             ManuallyDrop::drop(&mut self.mapping);
         }
 
@@ -155,4 +157,5 @@ impl<T> Drop for FileMapped<T> {
 }
 
 unsafe impl<T: Sync> Sync for FileMapped<T> {}
+
 unsafe impl<T: Send> Send for FileMapped<T> {}

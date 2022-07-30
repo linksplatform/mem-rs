@@ -47,9 +47,7 @@ impl<T: Default> const Default for Global<T> {
     }
 }
 
-impl<T: Default> RawMem<T> for Global<T>
-
-{
+impl<T: Default> RawMem<T> for Global<T> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.on_reserved_impl(capacity) }
     }
