@@ -64,6 +64,7 @@ fn with_non_default_inner() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(not(miri))]
 #[quickcheck]
 fn valid_allocated_after_error(prealloc: Vec<usize>, capacity: usize) -> bool {
     let len = prealloc.len();
