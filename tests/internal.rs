@@ -19,7 +19,9 @@ macro_rules! test_for_all_mem {
             fn [<$test _temp_file>]() { $impl(platform_mem::TempFile::new().unwrap()).unwrap(); }
 
             #[test]
-            fn [<$test _pre_alloc>]() { $impl(platform_mem::PreAlloc::new(internal::pre_allocated(100))).unwrap(); }
+            fn [<$test _pre_alloc>]() {
+                $impl(platform_mem::PreAlloc::new(internal::pre_allocated(100))).unwrap();
+            }
         }
     };
 }

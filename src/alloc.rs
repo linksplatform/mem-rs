@@ -1,8 +1,7 @@
-use crate::{base::Base, internal, IsTrue, RawMem, Result};
+use crate::{base::Base, internal, RawMem, Result};
 use std::{
     alloc::{Allocator, Layout},
     cmp::Ordering,
-    mem::size_of,
     ptr::{drop_in_place, NonNull},
 };
 use tap::Pipe;

@@ -1,4 +1,4 @@
-use crate::{base::Base, internal, IsTrue, RawMem, Result, DEFAULT_PAGE_SIZE};
+use crate::{base::Base, internal, RawMem, Result, DEFAULT_PAGE_SIZE};
 use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,

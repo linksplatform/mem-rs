@@ -1,5 +1,5 @@
-use crate::{FileMapped, IsTrue, RawMem, Result};
-use std::{fs::File, io, mem::size_of, path::Path};
+use crate::{FileMapped, RawMem, Result};
+use std::{fs::File, io, path::Path};
 
 /// Same as [`FileMapped`], but only allows temporary files
 #[repr(transparent)]

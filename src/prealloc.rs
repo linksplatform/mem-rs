@@ -1,5 +1,5 @@
 use crate::{Error, RawMem, Result};
-use std::{borrow::BorrowMut, marker::PhantomData, ops::Deref};
+use std::marker::PhantomData;
 use tap::TapOptional;
 
 /// [`RawMem`] that own any type that provides refs to memory block

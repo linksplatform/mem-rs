@@ -1,4 +1,4 @@
-use crate::{internal, Base, IsTrue, RawMem, Result};
+use crate::{internal, Base, RawMem, Result};
 use std::{
     alloc::{self, Layout},
     mem::size_of,

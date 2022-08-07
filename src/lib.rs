@@ -26,4 +26,3 @@ mod temp_file;
 mod traits;
 
 pub(crate) use base::Base;
-pub(crate) use internal::IsTrue;
