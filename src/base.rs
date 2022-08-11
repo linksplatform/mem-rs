@@ -3,7 +3,7 @@ use std::{
     ptr::{drop_in_place, NonNull},
 };
 
-pub(crate) struct Base<T> {
+pub struct Base<T> {
     // fixme: use `Unique`
     pub ptr: NonNull<[T]>,
     // for dropck: `RawMem` usually owns `T`
@@ -23,7 +23,7 @@ impl<T> Base<T> {
     }
 
     pub unsafe fn handle_narrow(&mut self, capacity: usize) {
-        drop_in_place(&mut self.ptr.as_mut()[capacity..])
+        drop_in_place(&mut self.ptr.as_mut()[capacity..]);
     }
 
     pub const fn allocated(&self) -> usize {

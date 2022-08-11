@@ -1,6 +1,6 @@
 use std::{mem::size_of, ptr::NonNull};
 
-pub fn to_bytes<T>(ptr: NonNull<[T]>) -> NonNull<[u8]> {
+pub const fn to_bytes<T>(ptr: NonNull<[T]>) -> NonNull<[u8]> {
     NonNull::slice_from_raw_parts(ptr.as_non_null_ptr().cast(), ptr.len() * size_of::<T>())
 }
 
@@ -29,16 +29,11 @@ pub unsafe fn from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
 
 // UNSAFE
 // wrapper for `.pipe` function
-pub(crate) fn safety_from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
+pub fn safety_from_bytes_slice<U>(bytes: &mut [u8]) -> &mut [U] {
     // SAFETY: the safety contract for `self::from_bytes_slice` must
     // be upheld by the caller.
     unsafe { from_bytes_slice::<U>(bytes) }
 }
-
-// to constraint `RawMem` implementations
-pub trait IsTrue<const COND: bool> {}
-
-impl IsTrue<true> for () {}
 
 #[cfg(all(test, not(miri)))]
 mod quick_tests {

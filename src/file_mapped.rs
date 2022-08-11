@@ -84,7 +84,7 @@ impl<T: Default> FileMapped<T> {
     }
 
     unsafe fn unmap(&mut self) {
-        ManuallyDrop::drop(&mut self.mapping)
+        ManuallyDrop::drop(&mut self.mapping);
     }
 }
 
@@ -114,7 +114,7 @@ impl<T: Default> FileMapped<T> {
             self.base.ptr = self
                 .map(cap)?
                 .pipe(internal::safety_from_bytes_slice)
-                .into()
+                .into();
         }
 
         if capacity > self.base.allocated() {

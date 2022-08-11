@@ -9,6 +9,7 @@ use tap::Pipe;
 pub struct Global<T>(Base<T>);
 
 impl<T> Global<T> {
+    #[must_use]
     pub const fn new() -> Self {
         Self(Base::dangling())
     }
@@ -71,7 +72,7 @@ impl<T> Drop for Global<T> {
                 ptr.as_non_null_ptr()
                     .cast::<u8>()
                     .as_ptr()
-                    .pipe(|ptr| alloc::dealloc(ptr, layout))
+                    .pipe(|ptr| alloc::dealloc(ptr, layout));
             }
         };
     }
