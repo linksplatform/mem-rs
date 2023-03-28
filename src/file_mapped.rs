@@ -1,7 +1,4 @@
-use crate::{
-    base::{default_expand, Base},
-    internal, RawMem, Result, DEFAULT_PAGE_SIZE,
-};
+use crate::{base::Base, internal, RawMem, Result, DEFAULT_PAGE_SIZE};
 use memmap2::{MmapMut, MmapOptions};
 use std::{
     cmp::max,
@@ -20,42 +17,7 @@ pub struct FileMapped<T> {
     mapping: ManuallyDrop<MmapMut>,
 }
 
-impl<T> FileMapped<T> {
-    /// Constructs a new `FileMapped` with provided file with expand handler
-    /// File must be opened in read-write mode.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::{fs::File, io};
-    /// use platform_mem::FileMapped;
-    ///
-    /// let file = File::options().read(true).write(true).open("file").unwrap();
-    /// let mut mem: io::Result<_> = FileMapped::new_with(file, || 0_usize);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns error if file is not opened in read-write mode
-    /// or it captured by other process.
-    pub fn new_with(file: File, with: impl FnMut() -> T + 'static) -> io::Result<Self> {
-        let capacity = DEFAULT_PAGE_SIZE / size_of::<T>();
-        let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
-
-        file.metadata()?
-            .len()
-            .pipe(|len| max(len, capacity as u64))
-            .pipe(|len| file.set_len(len))
-            .pipe(|_| Self {
-                base: Base::dangling_with(with),
-                mapping: ManuallyDrop::new(mapping),
-                file,
-            })
-            .pipe(Ok)
-    }
-}
-
-impl<T: Default + 'static> FileMapped<T> {
+impl<T: Default> FileMapped<T> {
     /// Constructs a new `FileMapped` with provided file.
     /// File must be opened in read-write mode.
     ///
@@ -74,7 +36,19 @@ impl<T: Default + 'static> FileMapped<T> {
     /// Returns error if file is not opened in read-write mode
     /// or it captured by other process.
     pub fn new(file: File) -> io::Result<Self> {
-        Self::new_with(file, default_expand)
+        let capacity = DEFAULT_PAGE_SIZE / size_of::<T>();
+        let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
+
+        file.metadata()?
+            .len()
+            .pipe(|len| max(len, capacity as u64))
+            .pipe(|len| file.set_len(len))
+            .pipe(|_| Self {
+                base: Base::dangling(),
+                mapping: ManuallyDrop::new(mapping),
+                file,
+            })
+            .pipe(Ok)
     }
 
     /// Constructs a new `FileMapped` with provided file,
@@ -100,9 +74,7 @@ impl<T: Default + 'static> FileMapped<T> {
             .open(path)
             .and_then(Self::new)
     }
-}
 
-impl<T> FileMapped<T> {
     unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
         self.mapping = MmapOptions::new()
             .len(capacity)
@@ -114,7 +86,9 @@ impl<T> FileMapped<T> {
     unsafe fn unmap(&mut self) {
         ManuallyDrop::drop(&mut self.mapping);
     }
+}
 
+impl<T: Default> FileMapped<T> {
     fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
         let cap = capacity * size_of::<T>();
 
@@ -153,7 +127,7 @@ impl<T> FileMapped<T> {
     }
 }
 
-impl<T> RawMem<T> for FileMapped<T> {
+impl<T: Default> RawMem<T> for FileMapped<T> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         self.alloc_impl(capacity)?;
 

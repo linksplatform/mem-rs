@@ -11,7 +11,14 @@ pub struct Alloc<T, A: Allocator> {
     alloc: A,
 }
 
-impl<T, A: Allocator> Alloc<T, A> {
+impl<T: Default, A: Allocator> Alloc<T, A> {
+    pub const fn new(alloc: A) -> Self {
+        Self {
+            base: Base::dangling(),
+            alloc,
+        }
+    }
+
     unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.base.ptr.len();
         let new_capacity = capacity;
@@ -48,16 +55,7 @@ impl<T, A: Allocator> Alloc<T, A> {
     }
 }
 
-impl<T: Default + 'static, A: Allocator> Alloc<T, A> {
-    pub fn new(alloc: A) -> Self {
-        Self {
-            base: Base::dangling(),
-            alloc,
-        }
-    }
-}
-
-impl<T, A: Allocator> RawMem<T> for Alloc<T, A> {
+impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.alloc_impl(capacity) }
     }

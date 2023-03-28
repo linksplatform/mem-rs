@@ -10,8 +10,8 @@ pub struct Global<T>(Base<T>);
 
 impl<T> Global<T> {
     #[must_use]
-    pub fn new_with(with: impl FnMut() -> T + 'static) -> Self {
-        Self(Base::dangling_with(with))
+    pub const fn new() -> Self {
+        Self(Base::dangling())
     }
 
     fn layout_impl(capacity: usize) -> Result<Layout> {
@@ -19,14 +19,7 @@ impl<T> Global<T> {
     }
 }
 
-impl<T: Default + 'static> Global<T> {
-    #[must_use]
-    pub fn new() -> Self {
-        Self(Base::dangling())
-    }
-}
-
-impl<T> Global<T> {
+impl<T: Default> Global<T> {
     unsafe fn on_reserved_impl(&mut self, new_capacity: usize) -> Result<&mut [T]> {
         let old_capacity = self.0.allocated();
         let new_in_bytes = new_capacity * size_of::<T>();
@@ -49,13 +42,13 @@ impl<T> Global<T> {
     }
 }
 
-impl<T: Default + 'static> Default for Global<T> {
+impl<T: Default> const Default for Global<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T> RawMem<T> for Global<T> {
+impl<T: Default> RawMem<T> for Global<T> {
     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
         unsafe { self.on_reserved_impl(capacity) }
     }
