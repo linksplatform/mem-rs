@@ -1,86 +1,54 @@
-use crate::{internal, RawMem, Result};
+use crate::{Error::CapacityOverflow, RawMem, Result};
 use std::{
     alloc::{Allocator, Layout},
     cmp::Ordering,
     marker::PhantomData,
+    mem,
+    mem::MaybeUninit,
     ptr::{drop_in_place, NonNull},
 };
 use tap::Pipe;
 
 pub struct Alloc<T, A: Allocator> {
-    ptr: NonNull<[T]>,
+    ptr: NonNull<T>,
+    len: usize,
     alloc: A,
     _marker: PhantomData<T>,
 }
 
 impl<T: Default, A: Allocator> Alloc<T, A> {
-    pub const fn new(alloc: A) -> Self {
+    pub const fn new(len: usize, alloc: A) -> Self {
         Self {
-            ptr: NonNull::slice_from_raw_parts(NonNull::dangling(), 0),
+            ptr: NonNull::dangling(),
+            len,
             alloc,
             _marker: PhantomData,
         }
     }
 
     fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        if self.ptr.len() == 0 {
+        if self.len == 0 {
             None
         } else {
             unsafe {
                 let layout = Layout::from_size_align_unchecked(
-                    mem::size_of::<T>().unchecked_mul(self.ptr.len()),
+                    mem::size_of::<T>().unchecked_mul(self.len),
                     mem::align_of::<T>(),
                 );
                 Some((self.ptr.cast(), layout))
             }
         }
     }
-
-    // unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
-    //     let old_capacity = self.base.ptr.len();
-    //     let new_capacity = capacity;
-    //
-    //     let result: Result<_> = try {
-    //         if self.base.ptr.as_non_null_ptr() == NonNull::dangling() {
-    //             let layout = Layout::array::<T>(capacity)?;
-    //             self.alloc.allocate(layout)?
-    //         } else {
-    //             let old_layout = Layout::array::<T>(old_capacity)?;
-    //             let new_layout = Layout::array::<T>(new_capacity)?;
-    //
-    //             let ptr = internal::to_bytes(self.base.ptr);
-    //             match new_capacity.cmp(&old_capacity) {
-    //                 Ordering::Less => {
-    //                     self.base.handle_narrow(new_capacity);
-    //                     self.alloc
-    //                         .shrink(ptr.as_non_null_ptr(), old_layout, new_layout)?
-    //                 }
-    //                 Ordering::Greater => {
-    //                     self.alloc
-    //                         .grow(ptr.as_non_null_ptr(), old_layout, new_layout)?
-    //                 }
-    //                 Ordering::Equal => ptr,
-    //             }
-    //         }
-    //     };
-    //
-    //     result.map(|ptr| {
-    //         self.base.ptr = internal::guaranteed_from_bytes(ptr);
-    //         self.base.handle_expand(old_capacity);
-    //         self.base.ptr.as_mut()
-    //     })
-    // }
 }
 
-// impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A> {
-//     fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-//         unsafe { self.alloc_impl(capacity) }
-//     }
-//
-//     fn allocated(&self) -> usize {
-//         self.base.allocated()
-//     }
-// }
+impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
+    type Item = T;
+    // fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
+    //     unsafe { self.alloc_impl(capacity) }
+    // }
+    //
+    fn allocated(&self) -> usize {}
+}
 
 // impl<T, A: Allocator> Drop for Alloc<T, A> {
 //     fn drop(&mut self) {
