@@ -22,6 +22,20 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         }
     }
 
+    fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
+        if self.ptr.len() == 0 {
+            None
+        } else {
+            unsafe {
+                let layout = Layout::from_size_align_unchecked(
+                    mem::size_of::<T>().unchecked_mul(self.ptr.len()),
+                    mem::align_of::<T>(),
+                );
+                Some((self.ptr.cast(), layout))
+            }
+        }
+    }
+
     // unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
     //     let old_capacity = self.base.ptr.len();
     //     let new_capacity = capacity;
