@@ -48,6 +48,25 @@ impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
     // }
     //
     fn allocated(&self) -> usize {}
+
+    unsafe fn grow(
+        &mut self,
+        cap: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        let req_cap = self.len.checked_add(cap).ok_or(CapacityOverflow)?;
+        let new_layout = Layout::array::<T>(req_cap)?;
+        let ptr = if let Some((ptr, old_layout)) = self.current_memory() {
+            self.alloc.grow(ptr, old_layout, new_layout)
+        } else {
+            self.alloc.allocate(new_layout)
+        };
+        fill(
+            NonNull::slice_from_raw_parts(ptr?.cast::<T>(), req_cap)
+                .get_unchecked_mut(self.len..)
+                .as_uninit_slice_mut(),
+        );
+    }
 }
 
 // impl<T, A: Allocator> Drop for Alloc<T, A> {
