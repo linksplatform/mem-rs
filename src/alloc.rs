@@ -14,6 +14,14 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T: Default, A: Allocator> Alloc<T, A> {
+    pub const fn new(alloc: A) -> Self {
+        Self {
+            ptr: NonNull::slice_from_raw_parts(NonNull::dangling(), 0),
+            alloc,
+            _marker: PhantomData,
+        }
+    }
+
     // unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
     //     let old_capacity = self.base.ptr.len();
     //     let new_capacity = capacity;
