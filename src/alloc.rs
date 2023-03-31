@@ -67,6 +67,8 @@ impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
                 .as_uninit_slice_mut(),
         );
     }
+
+    fn shrink(&mut self, cap: usize) -> Result<()> {}
 }
 
 // impl<T, A: Allocator> Drop for Alloc<T, A> {
