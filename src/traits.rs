@@ -1,4 +1,7 @@
-use std::alloc::{AllocError, LayoutError};
+use std::{
+    alloc::{AllocError, LayoutError},
+    mem::MaybeUninit,
+};
 
 // Bare metal platforms usually have very small amounts of RAM
 // (in the order of hundreds of KB)
@@ -94,7 +97,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// let slice = mem.shrink(15).unwrap();
 /// assert_eq!(slice, &[5, 4, 3, 2, 1]);
 /// ```
-pub trait RawMem<T> {
+pub trait RawMem {
+    type Item;
     /// Allocate or reserve a block of memory of the given `capacity`.
     /// If block is already allocated, it will be shrink or grow with data retention.
     ///
@@ -113,7 +117,7 @@ pub trait RawMem<T> {
     ///
     /// let slice = mem.alloc(20).unwrap();
     /// assert_eq!(slice.len(), 20);
-    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]>;
+    //fn alloc(&mut self, capacity: usize) -> Result<&mut [T]>;
 
     /// Current allocated elements count. Must be equal `alloc` result length.
     ///
@@ -129,7 +133,8 @@ pub trait RawMem<T> {
     /// let slice = mem.alloc(10).unwrap();
     /// assert_eq!(slice.len(), mem.allocated());
     /// ```
-    fn allocated(&self) -> usize;
+
+    fn allocated(&mut self) -> &mut [Self::Item];
 
     /// Returns the boundary (in count of elements) on the available elements.
     ///
@@ -167,31 +172,25 @@ pub trait RawMem<T> {
     /// assert_eq!(block.len(), 100);
     /// ```
     // fixme: maybe this should be return Option<usize> and None by default?
-    fn size_hint(&self) -> usize {
-        usize::MAX
-    }
+    //fn size_hint(&self) -> usize {
+    //    usize::MAX
+    //}
 
     /// Attempts to grow occupied memory.
     ///
     /// # Errors
     ///
     /// Returns error if the `allocated + capacity` overflowing
-    fn grow(&mut self, capacity: usize) -> Result<&mut [T]> {
-        self.allocated()
-            .checked_add(capacity)
-            .ok_or(Error::CapacityOverflow)
-            .and_then(|capacity| self.alloc(capacity))
-    }
+    unsafe fn grow(
+        &mut self,
+        cap: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]>;
 
     /// Attempts to shrink the memory block.
     ///
     /// # Errors
     ///
     /// Returns error if the `allocated - capacity` overflowing
-    fn shrink(&mut self, capacity: usize) -> Result<&mut [T]> {
-        self.allocated()
-            .checked_sub(capacity)
-            .ok_or(Error::CapacityOverflow)
-            .and_then(|capacity| self.alloc(capacity))
-    }
+    fn shrink(&mut self, cap: usize) -> Result<()>;
 }
