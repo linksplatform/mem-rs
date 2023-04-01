@@ -187,6 +187,22 @@ pub trait RawMem {
         fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
+    fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
+    where
+        Self::Item: Clone,
+    {
+        unsafe {
+            self.grow(cap, |uninit| {
+                if let Some((last, elems)) = uninit.split_last_mut() {
+                    for el in elems.iter_mut() {
+                        el.write(value.clone());
+                    }
+                    last.write(value);
+                }
+            })
+        }
+    }
+
     /// Attempts to shrink the memory block.
     ///
     /// # Errors
