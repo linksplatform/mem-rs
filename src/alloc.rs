@@ -30,6 +30,8 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         if self.len == 0 {
             None
         } else {
+            // SAFETY: we would use `Layout::array`, but memory is allocated yet
+            // and it's size+align is always valid (because we already alloc it by `Layout::array`)
             unsafe {
                 let layout = Layout::from_size_align_unchecked(
                     mem::size_of::<T>().unchecked_mul(self.len),
