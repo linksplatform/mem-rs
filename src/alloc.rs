@@ -76,7 +76,16 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
     }
 }
 
-impl<T, A: Allocator> Drop for Alloc<T, A> {}
+impl<T, A: Allocator> Drop for Alloc<T, A> {
+    fn drop(&mut self) {
+        if let Some((ptr, layout)) = self.current_memory() {
+            unsafe {
+                ptr::drop_in_place(self.allocated());
+                self.alloc.deallocate(ptr, layout);
+            }
+        }
+    }
+}
 
 unsafe impl<T: Sync, A: Allocator + Sync> Sync for Alloc<T, A> {}
 unsafe impl<T: Send, A: Allocator + Send> Send for Alloc<T, A> {}
