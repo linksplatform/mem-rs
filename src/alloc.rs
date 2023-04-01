@@ -20,7 +20,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
     pub const fn new(alloc: A) -> Self {
         Self {
             ptr: NonNull::dangling(),
-            len,
+            len: 0,
             alloc,
             _marker: PhantomData,
         }
