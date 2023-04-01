@@ -43,7 +43,7 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
     }
 }
 
-impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
+impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
     // fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
     //     unsafe { self.alloc_impl(capacity) }
