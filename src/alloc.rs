@@ -17,7 +17,7 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T: Default, A: Allocator> Alloc<T, A> {
-    pub const fn new(len: usize, alloc: A) -> Self {
+    pub const fn new(alloc: A) -> Self {
         Self {
             ptr: NonNull::dangling(),
             len,
