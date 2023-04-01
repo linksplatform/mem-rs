@@ -45,7 +45,9 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
 
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
-    fn allocated(&self) -> usize {}
+    fn allocated(&mut self) -> &mut [Self::Item] {
+        todo!()
+    }
 
     unsafe fn grow(
         &mut self,
