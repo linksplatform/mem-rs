@@ -68,7 +68,9 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         );
     }
 
-    fn shrink(&mut self, cap: usize) -> Result<()> {}
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        todo!()
+    }
 }
 
 // impl<T, A: Allocator> Drop for Alloc<T, A> {
