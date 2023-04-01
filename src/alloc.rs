@@ -17,10 +17,10 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T: Default, A: Allocator> Alloc<T, A> {
-    pub const fn new(len: usize, alloc: A) -> Self {
+    pub const fn new(alloc: A) -> Self {
         Self {
             ptr: NonNull::dangling(),
-            len,
+            len: 0,
             alloc,
             _marker: PhantomData,
         }
@@ -30,6 +30,8 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
         if self.len == 0 {
             None
         } else {
+            // SAFETY: we would use `Layout::array`, but memory is allocated yet
+            // and it's size+align is always valid (because we already alloc it by `Layout::array`)
             unsafe {
                 let layout = Layout::from_size_align_unchecked(
                     mem::size_of::<T>().unchecked_mul(self.len),
@@ -41,13 +43,11 @@ impl<T: Default, A: Allocator> Alloc<T, A> {
     }
 }
 
-impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
+impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
-    // fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-    //     unsafe { self.alloc_impl(capacity) }
-    // }
-    //
-    fn allocated(&self) -> usize {}
+    fn allocated(&mut self) -> &mut [Self::Item] {
+        todo!()
+    }
 
     unsafe fn grow(
         &mut self,
@@ -68,7 +68,9 @@ impl<T: Default, A: Allocator> RawMem for Alloc<T, A> {
         );
     }
 
-    fn shrink(&mut self, cap: usize) -> Result<()> {}
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        todo!()
+    }
 }
 
 // impl<T, A: Allocator> Drop for Alloc<T, A> {
