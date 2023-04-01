@@ -46,6 +46,9 @@ impl<T, A: Allocator> Alloc<T, A> {
 
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
+    fn allocated(&mut self) -> &mut [Self::Item] {
+        unsafe { std::slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+    }
 
     unsafe fn grow(
         &mut self,
