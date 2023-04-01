@@ -89,3 +89,12 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
 
 unsafe impl<T: Sync, A: Allocator + Sync> Sync for Alloc<T, A> {}
 unsafe impl<T: Send, A: Allocator + Send> Send for Alloc<T, A> {}
+
+#[test]
+fn test11() {
+    let mut alloc = Alloc::new(System);
+    assert_eq!(
+        alloc.grow_filled(10, String::from("lol")).unwrap(),
+        ["lol"; 10]
+    )
+}
