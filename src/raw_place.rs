@@ -4,6 +4,7 @@ use std::{
     marker::PhantomData,
     mem::{self, MaybeUninit},
     ptr::{self, NonNull},
+    slice,
 };
 
 pub struct RawPlace<T> {
@@ -15,6 +16,14 @@ pub struct RawPlace<T> {
 impl<T> RawPlace<T> {
     pub const fn dangling() -> Self {
         Self { ptr: NonNull::dangling(), cap: 0, _marker: PhantomData }
+    }
+
+    pub unsafe fn as_ref(&self) -> &[T] {
+        slice::from_raw_parts(self.ptr.as_ptr(), self.cap)
+    }
+
+    pub unsafe fn as_mut(&mut self) -> &mut [T] {
+        slice::from_raw_parts_mut(self.ptr.as_ptr(), self.cap)
     }
 
     pub unsafe fn current_memory(ptr: NonNull<T>, cap: usize) -> Option<(NonNull<u8>, Layout)> {

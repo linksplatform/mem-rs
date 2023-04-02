@@ -34,11 +34,11 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
 
     fn allocated(&self) -> &[Self::Item] {
-        unsafe { slice::from_raw_parts(self.buf.ptr.as_ptr(), self.buf.cap) }
+        unsafe { self.buf.as_ref() }
     }
 
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
-        unsafe { slice::from_raw_parts_mut(self.buf.ptr.as_ptr(), self.buf.cap) }
+        unsafe { self.buf.as_mut() }
     }
 
     unsafe fn grow(
@@ -84,4 +84,13 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
             }
         }
     }
+}
+
+// fixme: move into `lib.rs` for all `RawMem` implementors (or remove it as useless)
+fn _assert() {
+    use std::alloc::Global;
+
+    fn assert_sync_send<T: Sync + Send>() {}
+
+    assert_sync_send::<Alloc<(), Global>>();
 }
