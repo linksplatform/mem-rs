@@ -27,7 +27,7 @@ pub enum Error {
     /// let mut mem = Alloc::new(Global);
     /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
     /// ```
-    #[error("invalid capacity to RawMem::alloc/occupy/grow/shrink")]
+    #[error("exceeding the capacity maximum")]
     CapacityOverflow,
 
     #[error("cannot allocate {to_alloc} - available only {available}")]
