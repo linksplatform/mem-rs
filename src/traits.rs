@@ -1,7 +1,4 @@
-use std::{
-    alloc::{AllocError, LayoutError},
-    mem::MaybeUninit,
-};
+use std::{alloc::Layout, mem::MaybeUninit};
 
 // Bare metal platforms usually have very small amounts of RAM
 // (in the order of hundreds of KB)
@@ -22,43 +19,32 @@ pub enum Error {
     /// try grow/shrink more than `usize::MAX` bytes:
     ///
     /// ```
-    /// use platform_mem::{Error, Global, RawMem};
+    /// # #![feature(allocator_api)]
+    /// # #![feature(assert_matches)]
+    /// # use std::alloc::Global;
+    /// use std::assert_matches::assert_matches;
+    /// # use platform_mem::{Error, Alloc, RawMem};
     ///
-    /// let mut mem = Global::<usize>::new();
+    /// let mut mem = Alloc::new(Global);
     ///
-    /// let _ = mem.alloc(128);
-    ///
-    /// assert!(matches!(mem.grow(usize::MAX), Err(Error::CapacityOverflow)));
-    /// assert!(matches!(mem.shrink(usize::MAX), Err(Error::CapacityOverflow)));
+    /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
     /// ```
     #[error("invalid capacity to RawMem::alloc/occupy/grow/shrink")]
     CapacityOverflow,
-    /// Cannot to `allocate` more than `available`
-    ///
-    /// # Examples
-    ///
-    /// try to allocate more than `available` elements:
-    ///
-    /// ```
-    /// use platform_mem::{Error, PreAlloc, RawMem};
-    ///
-    /// let mut mem = PreAlloc::new(vec![0_usize; 64]);
-    ///
-    /// assert!(matches!(mem.alloc(128), Err(Error::OverAlloc { available: 64, to_alloc: 128 })));
+
     #[error("cannot allocate {to_alloc} - available only {available}")]
     OverAlloc { available: usize, to_alloc: usize },
-    /// Memory allocator return an error
-    /// This error won't happen,
-    /// but it may reveal buggy `RawMem` implementation.
-    #[error(transparent)]
-    AllocError(#[from] AllocError),
-    /// Memory allocator accept incorrect [`Layout`]
-    /// This error won't happen,
-    /// but it may reveal buggy `RawMem` implementation.
-    ///
-    /// [`Layout`]: std::alloc::Layout
-    #[error(transparent)]
-    LayoutError(#[from] LayoutError),
+
+    /// The memory allocator returned an error
+    #[error("memory allocation of {layout:?} failed")]
+    AllocError {
+        /// The layout of allocation request that failed
+        layout: Layout,
+
+        #[doc(hidden)]
+        non_exhaustive: (),
+    },
+
     /// System error memory allocation occurred
     #[error(transparent)]
     System(#[from] std::io::Error),
@@ -67,120 +53,30 @@ pub enum Error {
 /// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// The implementation of `RawMem` can allocate, increase, decrease one arbitrary block
-/// of elements of the `T` type
-///
-/// Only one block can exist at time, so mut slice `&mut [T]` is returned to it
-///
-/// # Examples
-///
-/// Basic usage:
-///
-/// ```
-/// #![feature(allocator_api)]
-///
-/// use std::alloc::Global;
-/// use platform_mem::{RawMem, Alloc};
-///
-/// // `RawMem` when alloc memory via any `Allocator`
-/// let mut mem = Alloc::<usize, _>::new(Global);
-/// let slice = mem.alloc(10).unwrap();
-///
-/// slice.copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-///
-/// // get new ref after realloc
-/// let slice = mem.grow(10).unwrap();
-/// assert_eq!(slice, &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-///
-/// slice[0..5].reverse();
-///
-/// let slice = mem.shrink(15).unwrap();
-/// assert_eq!(slice, &[5, 4, 3, 2, 1]);
-/// ```
 pub trait RawMem {
     type Item;
-    /// Allocate or reserve a block of memory of the given `capacity`.
-    /// If block is already allocated, it will be shrink or grow with data retention.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```
-    /// // alloc mem via `std::alloc`
-    /// use platform_mem::{RawMem, Global};
-    ///
-    /// let mut mem = Global::<usize>::new();
-    ///
-    /// let slice = mem.alloc(10).unwrap();
-    /// assert_eq!(slice.len(), 10);
-    ///
-    /// let slice = mem.alloc(20).unwrap();
-    /// assert_eq!(slice.len(), 20);
-    //fn alloc(&mut self, capacity: usize) -> Result<&mut [T]>;
-
-    /// Current allocated elements count. Must be equal `alloc` result length.
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
-    /// ```
-    /// use platform_mem::{RawMem, Global};
-    ///
-    /// let mut mem = Global::<usize>::new();
-    ///
-    /// let slice = mem.alloc(10).unwrap();
-    /// assert_eq!(slice.len(), mem.allocated());
-    /// ```
 
     fn allocated(&mut self) -> &mut [Self::Item];
 
-    /// Returns the boundary (in count of elements) on the available elements.
+    /// # Safety
+    /// Caller must guarantee that `fill` makes the uninitialized part valid for
+    /// [`MaybeUninit::slice_assume_init_mut`]
     ///
-    /// A [`usize::MAX`] here means that `RawMem` can allocate memory indefinitely
-    /// (as long as the system allows)
+    /// ### Incorrect usage
+    /// ```no_run
+    /// # #![feature(allocator_api)]
+    /// # use std::alloc::Global;
+    /// use std::mem::MaybeUninit;
+    /// # use platform_mem::{Alloc, RawMem};
     ///
-    /// # Implementation notes
-    ///
-    /// It is not enforced that an `RawMem` implementation yields the declared available elements.
-    /// A buggy `RawMem` may yield less than  the upper bound of elements.
-    ///
-    /// `size_hint()` is primarily intended to be used for limited `RawMem` implementors,
-    /// for example, reserving space without getting an error
-    /// when the available memory limit is exceeded
-    ///
-    /// The default implementation returns [`usize::MAX`] which is correct for any `RawMem`,
-    /// but it can interfere when approaching the boundary of available elements
-    ///
-    /// # Examples
-    ///
-    /// Basic usage:
-    ///
+    /// let mut alloc = Alloc::new(Global);
+    /// unsafe {
+    ///     alloc.grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
+    ///         // `RawMem` relies on the fact that we initialize memory
+    ///         // even if they are primitives
+    ///     }).unwrap();
+    /// }
     /// ```
-    /// use std::cmp::min;
-    /// use platform_mem::{PreAlloc, RawMem};
-    ///
-    /// let mut mem = PreAlloc::new(vec![0; 100]);
-    ///
-    /// let crazy_capacity = usize::MAX;
-    /// let _ = mem.alloc(crazy_capacity).unwrap_err();
-    ///
-    /// let smart_capacity = min(crazy_capacity, mem.size_hint());
-    /// let block = mem.alloc(smart_capacity).unwrap();
-    ///
-    /// assert_eq!(block.len(), 100);
-    /// ```
-    // fixme: maybe this should be return Option<usize> and None by default?
-    //fn size_hint(&self) -> usize {
-    //    usize::MAX
-    //}
-
-    /// Attempts to grow occupied memory.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the `allocated + capacity` overflowing
     unsafe fn grow(
         &mut self,
         cap: usize,
@@ -191,14 +87,18 @@ pub trait RawMem {
     where
         Self::Item: Clone,
     {
+        fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
+            if let Some((last, elems)) = uninit.split_last_mut() {
+                for el in elems.iter_mut() {
+                    el.write(val.clone());
+                }
+                last.write(val);
+            }
+        }
+
         unsafe {
             self.grow(cap, |uninit| {
-                if let Some((last, elems)) = uninit.split_last_mut() {
-                    for el in elems.iter_mut() {
-                        el.write(value.clone());
-                    }
-                    last.write(value);
-                }
+                uninit_fill(uninit, value);
             })
         }
     }
