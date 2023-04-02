@@ -7,6 +7,7 @@
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
+#![deny(unused_must_use)]
 #![warn(missing_debug_implementations)]
 
 // Bare metal platforms usually have very small amounts of RAM

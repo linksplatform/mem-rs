@@ -9,7 +9,6 @@ use {
         fmt::{self, Debug, Formatter},
         mem::{ManuallyDrop, MaybeUninit},
         ptr::NonNull,
-        slice,
     },
 };
 
