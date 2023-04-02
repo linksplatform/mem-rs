@@ -12,11 +12,11 @@ pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else 
 #[non_exhaustive]
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
-    /// (usually `usize::MAX` bytes).
+    /// (usually `isize::MAX` bytes).
     ///
-    /// # Examples
+    /// ## Examples
     ///
-    /// try grow/shrink more than `usize::MAX` bytes:
+    /// grow more than `isize::MAX` bytes:
     ///
     /// ```
     /// # #![feature(allocator_api)]
@@ -24,9 +24,7 @@ pub enum Error {
     /// # use std::alloc::Global;
     /// # use std::assert_matches::assert_matches;
     /// # use platform_mem::{Error, Alloc, RawMem};
-    ///
     /// let mut mem = Alloc::new(Global);
-    ///
     /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
     /// ```
     #[error("invalid capacity to RawMem::alloc/occupy/grow/shrink")]
@@ -68,7 +66,6 @@ pub trait RawMem {
     /// # use std::alloc::Global;
     /// # use std::mem::MaybeUninit;
     /// # use platform_mem::{Alloc, RawMem};
-    ///
     /// let mut alloc = Alloc::new(Global);
     /// unsafe {
     ///     alloc.grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
@@ -103,10 +100,5 @@ pub trait RawMem {
         }
     }
 
-    /// Attempts to shrink the memory block.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if the `allocated - capacity` overflowing
     fn shrink(&mut self, cap: usize) -> Result<()>;
 }
