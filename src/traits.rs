@@ -22,7 +22,7 @@ pub enum Error {
     /// # #![feature(allocator_api)]
     /// # #![feature(assert_matches)]
     /// # use std::alloc::Global;
-    /// use std::assert_matches::assert_matches;
+    /// # use std::assert_matches::assert_matches;
     /// # use platform_mem::{Error, Alloc, RawMem};
     ///
     /// let mut mem = Alloc::new(Global);
@@ -66,7 +66,7 @@ pub trait RawMem {
     /// ```no_run
     /// # #![feature(allocator_api)]
     /// # use std::alloc::Global;
-    /// use std::mem::MaybeUninit;
+    /// # use std::mem::MaybeUninit;
     /// # use platform_mem::{Alloc, RawMem};
     ///
     /// let mut alloc = Alloc::new(Global);
