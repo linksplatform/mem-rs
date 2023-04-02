@@ -1,11 +1,5 @@
 use std::{alloc::Layout, mem::MaybeUninit};
 
-// Bare metal platforms usually have very small amounts of RAM
-// (in the order of hundreds of KB)
-/// RAM page size which is likely to be the same on most systems
-#[rustfmt::skip]
-pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else { 8 * 1024 };
-
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
@@ -54,7 +48,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub trait RawMem {
     type Item;
 
-    fn allocated(&mut self) -> &mut [Self::Item];
+    fn allocated(&self) -> &[Self::Item];
+    fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
     /// Caller must guarantee that `fill` makes the uninitialized part valid for

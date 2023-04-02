@@ -1,79 +1,27 @@
-// #![feature(const_nonnull_slice_from_raw_parts)]
-// #![feature(nonnull_slice_from_raw_parts)]
 #![feature(allocator_api)]
 #![feature(unchecked_math)]
 #![feature(maybe_uninit_slice)]
-// #![feature(default_free_fn)]
-// #![feature(layout_for_ptr)]
 #![feature(slice_ptr_get)]
 #![feature(ptr_as_uninit)]
-// #![feature(try_blocks)]
-// #![feature(slice_ptr_len)]
-// #![feature(io_error_other)]
-// #![feature(const_trait_impl)]
+//
+// special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
-// #![warn(
-//     clippy::perf,
-//     clippy::single_match_else,
-//     clippy::dbg_macro,
-//     clippy::doc_markdown,
-//     clippy::wildcard_imports,
-//     clippy::struct_excessive_bools,
-//     clippy::semicolon_if_nothing_returned,
-//     clippy::pedantic,
-//     clippy::nursery
-// )]
-// for `clippy::pedantic`
-// #![allow(
-//     clippy::missing_errors_doc,
-//     clippy::missing_panics_doc,
-//     clippy::missing_safety_doc,
-//     clippy::let_underscore_drop,
-//     clippy::non_send_fields_in_send_ty,
-// )]
-#![deny(
-    // clippy::all,
-    // clippy::cast_lossless,
-    // clippy::redundant_closure_for_method_calls,
-    // clippy::use_self,
-    // clippy::unnested_or_patterns,
-    // clippy::trivially_copy_pass_by_ref,
-    // clippy::needless_pass_by_value,
-    // clippy::match_wildcard_for_single_variants,
-    // clippy::map_unwrap_or,
-    unused_qualifications,
-    unused_import_braces,
-    unused_lifetimes,
-    // unreachable_pub,
-    trivial_numeric_casts,
-    // rustdoc,
-    // missing_debug_implementations,
-    // missing_copy_implementations,
-    deprecated_in_future,
-    meta_variable_misuse,
-    non_ascii_idents,
-    rust_2018_compatibility,
-    rust_2018_idioms,
-    future_incompatible,
-    nonstandard_style,
-)]
-// must be fixed later
-#![allow(clippy::needless_pass_by_value, clippy::comparison_chain)]
+// rust compiler lints
+#![warn(missing_debug_implementations)]
 
-pub use alloc::Alloc;
-// pub use file_mapped::FileMapped;
-// pub use global::Global;
-// pub use prealloc::PreAlloc;
-// pub use temp_file::TempFile;
-pub use traits::{Error, RawMem, Result, DEFAULT_PAGE_SIZE};
+// Bare metal platforms usually have very small amounts of RAM
+// (in the order of hundreds of KB)
+/// RAM page size which is likely to be the same on most systems
+#[rustfmt::skip]
+pub const DEFAULT_PAGE_SIZE: usize = if cfg!(target_os = "espidf") { 512 } else { 8 * 1024 };
+
+pub use {
+    alloc::Alloc,
+    raw_mem::{Error, RawMem, Result},
+};
+pub(crate) use {raw_place::RawPlace, utils::debug_mem};
 
 mod alloc;
-// mod base;
-// mod file_mapped;
-// mod global;
-// mod internal;
-// mod prealloc;
-// mod temp_file;
-mod traits;
-
-//pub(crate) use base::Base;
+mod raw_mem;
+mod raw_place;
+mod utils;
