@@ -8,15 +8,19 @@ use std::{
 };
 
 pub struct RawPlace<T> {
-    pub ptr: NonNull<T>,
-    len: usize,     // use to drop at panic
-    pub cap: usize, // usually `cap` is same `len`
+    ptr: NonNull<T>,
+    len: usize, // use to drop at panic
+    cap: usize, // usually `cap` is same `len`
     _marker: PhantomData<T>,
 }
 
 impl<T> RawPlace<T> {
     pub const fn dangling() -> Self {
         Self { ptr: NonNull::dangling(), len: 0, cap: 0, _marker: PhantomData }
+    }
+
+    pub fn cap(&self) -> usize {
+        self.cap
     }
 
     pub unsafe fn as_slice(&self) -> &[T] {

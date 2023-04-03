@@ -39,7 +39,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         addition: usize,
         fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]> {
-        let cap = self.buf.cap.checked_add(addition).ok_or(CapacityOverflow)?;
+        let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
         let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
 
         let ptr = if let Some((ptr, old_layout)) = self.buf.current_memory() {
