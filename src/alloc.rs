@@ -7,18 +7,19 @@ use {
     std::{
         alloc::{Allocator, Layout},
         fmt::{self, Debug, Formatter},
-        mem::{ManuallyDrop, MaybeUninit},
+        mem::MaybeUninit,
+        ptr,
     },
 };
 
 pub struct Alloc<T, A: Allocator> {
-    buf: ManuallyDrop<RawPlace<T>>,
+    buf: RawPlace<T>,
     alloc: A,
 }
 
 impl<T, A: Allocator> Alloc<T, A> {
     pub const fn new(alloc: A) -> Self {
-        Self { buf: ManuallyDrop::new(RawPlace::dangling()), alloc }
+        Self { buf: RawPlace::dangling(), alloc }
     }
 }
 
@@ -26,11 +27,11 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
 
     fn allocated(&self) -> &[Self::Item] {
-        unsafe { self.buf.as_ref() }
+        unsafe { self.buf.as_slice() }
     }
 
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
-        unsafe { self.buf.as_mut() }
+        unsafe { self.buf.as_slice_mut() }
     }
 
     unsafe fn grow(
@@ -67,11 +68,7 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
         unsafe {
             if let Some((ptr, layout)) = self.buf.current_memory() {
-                // we should to drop this before `Self` because it is like `RawVec`, but in reverse
-                // `RawPlace` - drop memory
-                // `Self` - deallocate memory
-                ManuallyDrop::drop(&mut self.buf);
-
+                ptr::drop_in_place(self.buf.as_slice_mut());
                 self.alloc.deallocate(ptr, layout);
             }
         }

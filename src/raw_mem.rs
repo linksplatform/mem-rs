@@ -1,4 +1,8 @@
-use std::{alloc::Layout, mem::MaybeUninit};
+use std::{
+    alloc::Layout,
+    mem::{self, MaybeUninit},
+    ptr,
+};
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
@@ -80,12 +84,35 @@ pub trait RawMem {
         Self::Item: Clone,
     {
         fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
-            if let Some((last, elems)) = uninit.split_last_mut() {
+            struct Guard<'a, T> {
+                slice: &'a mut [MaybeUninit<T>],
+                init: usize,
+            }
+
+            impl<'a, T> Drop for Guard<'a, T> {
+                fn drop(&mut self) {
+                    // SAFETY: this raw slice will contain only initialized objects
+                    // that's why, it is allowed to drop it.
+                    unsafe {
+                        ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
+                            &mut self.slice[..self.init],
+                        ));
+                    }
+                }
+            }
+
+            let mut guard = Guard { slice: uninit, init: 0 };
+
+            if let Some((last, elems)) = guard.slice.split_last_mut() {
                 for el in elems.iter_mut() {
                     el.write(val.clone());
+                    guard.init += 1;
                 }
                 last.write(val);
+                guard.init += 1;
             }
+
+            mem::forget(guard);
         }
 
         unsafe {

@@ -3,27 +3,28 @@ use std::{
     fmt::{self, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
-    ptr::{self, NonNull},
+    ptr::NonNull,
     slice,
 };
 
 pub struct RawPlace<T> {
     pub ptr: NonNull<T>,
-    pub cap: usize,
+    len: usize,     // use to drop at panic
+    pub cap: usize, // usually `cap` is same `len`
     _marker: PhantomData<T>,
 }
 
 impl<T> RawPlace<T> {
     pub const fn dangling() -> Self {
-        Self { ptr: NonNull::dangling(), cap: 0, _marker: PhantomData }
+        Self { ptr: NonNull::dangling(), len: 0, cap: 0, _marker: PhantomData }
     }
 
-    pub unsafe fn as_ref(&self) -> &[T] {
-        slice::from_raw_parts(self.ptr.as_ptr(), self.cap)
+    pub unsafe fn as_slice(&self) -> &[T] {
+        slice::from_raw_parts(self.ptr.as_ptr(), self.len)
     }
 
-    pub unsafe fn as_mut(&mut self) -> &mut [T] {
-        slice::from_raw_parts_mut(self.ptr.as_ptr(), self.cap)
+    pub unsafe fn as_slice_mut(&mut self) -> &mut [T] {
+        slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
     }
 
     /// # Safety
@@ -50,18 +51,13 @@ impl<T> RawPlace<T> {
             .get_unchecked_mut(self.cap..)
             .as_uninit_slice_mut();
 
-        self.ptr = ptr; // guard will has same ptr but old capacity
-
-        // use `self` as guard and later replace it back
-        // `mem::take` may be misleading
-        let guard = mem::replace(self, Self::dangling());
+        self.ptr = ptr;
+        self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
+        //                 ( alloc memory )
 
         fill(uninit); // panic out!
 
-        // underscore exactly got dangling guard
-        // it's `Drop`does nothing
-        let _ = mem::replace(self, guard);
-        self.cap = cap; // set new capacity only after possible `drop_in_place` with old capacity
+        self.len = cap; // `len` is same `cap` only if `uninit` was init
 
         MaybeUninit::slice_assume_init_mut(uninit)
     }
@@ -70,14 +66,6 @@ impl<T> RawPlace<T> {
 impl<T> fmt::Debug for RawPlace<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "({:?}..{})", self.ptr, self.cap)
-    }
-}
-
-impl<T> Drop for RawPlace<T> {
-    fn drop(&mut self) {
-        unsafe {
-            ptr::drop_in_place(ptr::slice_from_raw_parts_mut(self.ptr.as_ptr(), self.cap));
-        }
     }
 }
 
