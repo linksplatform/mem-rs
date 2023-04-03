@@ -26,15 +26,17 @@ impl<T> RawPlace<T> {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.cap)
     }
 
-    pub unsafe fn current_memory(ptr: NonNull<T>, cap: usize) -> Option<(NonNull<u8>, Layout)> {
-        if cap == 0 {
+    /// # Safety
+    /// `RawPlace` must contain valid `ptr` (aligned) and `cap` (valid for `Layout`)
+    pub unsafe fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
+        if self.cap == 0 {
             None
         } else {
             let layout = Layout::from_size_align_unchecked(
-                mem::size_of::<T>().unchecked_mul(cap),
+                mem::size_of::<T>().unchecked_mul(self.cap),
                 mem::align_of::<T>(),
             );
-            Some((ptr.cast(), layout))
+            Some((self.ptr.cast(), layout))
         }
     }
 

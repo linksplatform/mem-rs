@@ -8,7 +8,6 @@ use {
         alloc::{Allocator, Layout},
         fmt::{self, Debug, Formatter},
         mem::{ManuallyDrop, MaybeUninit},
-        ptr::NonNull,
     },
 };
 
@@ -20,12 +19,6 @@ pub struct Alloc<T, A: Allocator> {
 impl<T, A: Allocator> Alloc<T, A> {
     pub const fn new(alloc: A) -> Self {
         Self { buf: ManuallyDrop::new(RawPlace::dangling()), alloc }
-    }
-
-    fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        // SAFETY: we would use `Layout::array`, but memory is allocated yet
-        // and it's size+align is always valid (because we already alloc it by `Layout::array`)
-        unsafe { RawPlace::current_memory(self.buf.ptr, self.buf.cap) }
     }
 }
 
@@ -48,7 +41,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         let cap = self.buf.cap.checked_add(addition).ok_or(CapacityOverflow)?;
         let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
 
-        let ptr = if let Some((ptr, old_layout)) = self.current_memory() {
+        let ptr = if let Some((ptr, old_layout)) = self.buf.current_memory() {
             self.alloc.grow(ptr, old_layout, new_layout)
         } else {
             self.alloc.allocate(new_layout)
@@ -72,8 +65,8 @@ impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
 
 impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
-        if let Some((ptr, layout)) = self.current_memory() {
-            unsafe {
+        unsafe {
+            if let Some((ptr, layout)) = self.buf.current_memory() {
                 // we should to drop this before `Self` because it is like `RawVec`, but in reverse
                 // `RawPlace` - drop memory
                 // `Self` - deallocate memory
