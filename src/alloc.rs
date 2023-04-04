@@ -73,7 +73,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
 
         #[allow(clippy::unit_arg)] // it is allows shortest return `Ok(())`
         Ok({
-            self.buf.set_ptr(ptr.cast());
+            self.buf.set_ptr(ptr);
         })
     }
 }

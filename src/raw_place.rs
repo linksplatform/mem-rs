@@ -78,8 +78,8 @@ impl<T> RawPlace<T> {
         self.len = cap;
     }
 
-    pub fn set_ptr(&mut self, ptr: NonNull<T>) {
-        self.ptr = ptr;
+    pub fn set_ptr(&mut self, ptr: NonNull<[u8]>) {
+        self.ptr = ptr.cast();
     }
 }
 
