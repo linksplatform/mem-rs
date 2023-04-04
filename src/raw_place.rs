@@ -3,7 +3,7 @@ use std::{
     fmt::{self, Formatter},
     marker::PhantomData,
     mem::{self, MaybeUninit},
-    ptr::NonNull,
+    ptr::{self, NonNull},
     slice,
 };
 
@@ -31,17 +31,18 @@ impl<T> RawPlace<T> {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
     }
 
-    /// # Safety
-    /// `RawPlace` must contain valid `ptr` (aligned) and `cap` (valid for `Layout`)
-    pub unsafe fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
+    // we change `ptr`/`cap` only in provided functions, so it's safe
+    pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         if self.cap == 0 {
             None
         } else {
-            let layout = Layout::from_size_align_unchecked(
-                mem::size_of::<T>().unchecked_mul(self.cap),
-                mem::align_of::<T>(),
-            );
-            Some((self.ptr.cast(), layout))
+            unsafe {
+                let layout = Layout::from_size_align_unchecked(
+                    mem::size_of::<T>().unchecked_mul(self.cap),
+                    mem::align_of::<T>(),
+                );
+                Some((self.ptr.cast(), layout))
+            }
         }
     }
 
@@ -64,6 +65,21 @@ impl<T> RawPlace<T> {
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 
         MaybeUninit::slice_assume_init_mut(uninit)
+    }
+
+    pub fn shrink_to(&mut self, cap: usize) {
+        assert!(cap <= self.cap);
+
+        unsafe {
+            ptr::drop_in_place(&mut self.as_slice_mut()[cap..]);
+        }
+
+        self.cap = cap;
+        self.len = cap;
+    }
+
+    pub fn set_ptr(&mut self, ptr: NonNull<T>) {
+        self.ptr = ptr;
     }
 }
 

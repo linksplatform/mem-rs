@@ -7,7 +7,7 @@ use {
     std::{
         alloc::{Allocator, Layout},
         fmt::{self, Debug, Formatter},
-        mem::MaybeUninit,
+        mem::{self, MaybeUninit},
         ptr,
     },
 };
@@ -53,8 +53,28 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         Ok(self.buf.handle_fill(ptr, cap, fill))
     }
 
-    fn shrink(&mut self, _: usize) -> Result<()> {
-        todo!()
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
+
+        let Some((ptr, layout)) = self.buf.current_memory() else {
+            return Ok(());
+        };
+        self.buf.shrink_to(cap);
+
+        let ptr = unsafe {
+            // `Layout::array` cannot overflow here because it would have
+            // overflowed earlier when capacity was larger.
+            let new_size = mem::size_of::<T>().unchecked_mul(cap);
+            let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
+            self.alloc
+                .shrink(ptr, layout, new_layout)
+                .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+        };
+
+        #[allow(clippy::unit_arg)] // it is allows shortest return `Ok(())`
+        Ok({
+            self.buf.set_ptr(ptr.cast());
+        })
     }
 }
 
