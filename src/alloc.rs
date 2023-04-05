@@ -5,7 +5,7 @@ use {
         RawMem, RawPlace, Result,
     },
     std::{
-        alloc::{Allocator, Layout},
+        alloc::{Allocator, Layout, System},
         fmt::{self, Debug, Formatter},
         mem::{self, MaybeUninit},
         ptr,
@@ -102,4 +102,25 @@ fn _assert() {
     fn assert_sync_send<T: Sync + Send>() {}
 
     assert_sync_send::<Alloc<(), Global>>();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
+    where
+        M::Item: Clone,
+    {
+        mem.grow_filled(10, val.clone())?;
+        assert_eq!(mem.allocated().len(), 10);
+        mem.shrink(10)?;
+        assert_eq!(mem.allocated().len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn for_both_test() -> Result<()> {
+        inner(Alloc::new(System), "lol".to_string())?;
+        Ok(())
+    }
 }
