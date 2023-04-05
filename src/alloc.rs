@@ -111,7 +111,7 @@ mod tests {
     where
         M::Item: Clone,
     {
-        mem.grow_filled(10, val.clone())?;
+        mem.grow_filled(10, val)?;
         assert_eq!(mem.allocated().len(), 10);
         mem.shrink(10)?;
         assert_eq!(mem.allocated().len(), 0);
