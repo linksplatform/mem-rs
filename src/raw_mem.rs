@@ -79,6 +79,10 @@ pub trait RawMem {
         fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
+    unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
+        self.grow(cap, |_| {})
+    }
+
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,

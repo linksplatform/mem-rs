@@ -17,6 +17,7 @@ pub use {
 pub(crate) use {raw_place::RawPlace, utils::debug_mem};
 
 mod alloc;
+mod file_mapped;
 mod raw_mem;
 mod raw_place;
 mod utils;
