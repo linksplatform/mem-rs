@@ -3,14 +3,12 @@ use {
     memmap2::{MmapMut, MmapOptions},
     std::{
         alloc::Layout,
-        cmp::max,
         fs::File,
         io,
-        mem::{size_of, ManuallyDrop, MaybeUninit},
+        mem::MaybeUninit,
         path::Path,
         ptr::{self, NonNull},
     },
-    tap::Pipe,
 };
 
 pub struct FileMapped<T> {
