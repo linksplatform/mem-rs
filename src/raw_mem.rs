@@ -95,7 +95,7 @@ pub trait RawMem {
     /// use platform_mem::{FileMapped, RawMem, Result};
     ///
     /// fn main() -> Result<()> {
-    ///     let mut  file = FileMapped::from_path("..")?;
+    ///     let mut file = FileMapped::from_path("..")?;
     ///     // file is always represents as initialized bytes
     ///     // and usize is transparent as bytes
     ///     let _: &mut [usize] = unsafe { file.grow_assumed(10)? };
