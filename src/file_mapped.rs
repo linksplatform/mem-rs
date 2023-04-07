@@ -1,161 +1,105 @@
-use crate::{base::Base, internal, RawMem, Result, DEFAULT_PAGE_SIZE};
-use memmap2::{MmapMut, MmapOptions};
-use std::{
-    cmp::max,
-    fs::File,
-    io,
-    mem::{size_of, ManuallyDrop},
-    path::Path,
-    ptr::drop_in_place,
+use {
+    crate::{raw_place::RawPlace, utils, Error::CapacityOverflow, RawMem, Result},
+    memmap2::{MmapMut, MmapOptions},
+    std::{
+        alloc::Layout,
+        fmt::{self, Formatter},
+        fs::File,
+        io,
+        mem::MaybeUninit,
+        path::Path,
+        ptr::{self, NonNull},
+    },
 };
-use tap::Pipe;
 
-/// [`RawMem`] that uses mapped file as space for a block of memory. It can change the file size
 pub struct FileMapped<T> {
-    base: Base<T>,
+    buf: RawPlace<T>,
+    mmap: Option<MmapMut>,
     pub(crate) file: File,
-    mapping: ManuallyDrop<MmapMut>,
 }
 
-impl<T: Default> FileMapped<T> {
-    /// Constructs a new `FileMapped` with provided file.
-    /// File must be opened in read-write mode.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::{fs::File, io};
-    /// use platform_mem::FileMapped;
-    ///
-    /// let file = File::options().read(true).write(true).open("file").unwrap();
-    /// let mut mem: io::Result<FileMapped<usize>> = FileMapped::new(file);
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns error if file is not opened in read-write mode
-    /// or it captured by other process.
+impl<T> FileMapped<T> {
     pub fn new(file: File) -> io::Result<Self> {
-        let capacity = DEFAULT_PAGE_SIZE / size_of::<T>();
-        let mapping = unsafe { MmapOptions::new().map_mut(&file)? };
+        const MIN_PAGE_SIZE: u64 = 4096;
 
-        file.metadata()?
-            .len()
-            .pipe(|len| max(len, capacity as u64))
-            .pipe(|len| file.set_len(len))
-            .pipe(|_| Self {
-                base: Base::dangling(),
-                mapping: ManuallyDrop::new(mapping),
-                file,
-            })
-            .pipe(Ok)
+        if file.metadata()?.len() < MIN_PAGE_SIZE {
+            file.set_len(MIN_PAGE_SIZE)?;
+        }
+
+        Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
     }
 
-    /// Constructs a new `FileMapped` with provided file,
-    /// when open as read/write mode.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use std::io;
-    /// use platform_mem::FileMapped;
-    ///
-    /// let mut mem: io::Result<FileMapped<usize>> = FileMapped::from_path("file");
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns error if file is captured by other process.
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        File::options()
-            .create(true)
-            .read(true)
-            .write(true)
-            .open(path)
-            .and_then(Self::new)
+        File::options().create(true).read(true).write(true).open(path).and_then(Self::new)
     }
 
-    unsafe fn map(&mut self, capacity: usize) -> io::Result<&mut [u8]> {
-        self.mapping = MmapOptions::new()
-            .len(capacity)
-            .map_mut(&self.file)?
-            .pipe(ManuallyDrop::new);
-        self.mapping.as_mut().pipe(Ok)
+    fn map_yet(&mut self, cap: u64) -> io::Result<MmapMut> {
+        unsafe { MmapOptions::new().len(cap as usize).map_mut(&self.file) }
     }
 
-    unsafe fn unmap(&mut self) {
-        ManuallyDrop::drop(&mut self.mapping);
+    unsafe fn assume_mapped(&mut self) -> &mut [u8] {
+        self.mmap.as_mut().unwrap_unchecked()
     }
 }
 
-impl<T: Default> FileMapped<T> {
-    fn alloc_impl(&mut self, capacity: usize) -> io::Result<()> {
-        let cap = capacity * size_of::<T>();
+impl<T> RawMem for FileMapped<T> {
+    type Item = T;
 
-        if capacity < self.base.allocated() {
-            unsafe {
-                self.base.handle_narrow(capacity);
-            }
-        }
-
-        // SAFETY: `self.mapping` is initialized
-        unsafe {
-            self.unmap();
-        }
-
-        self.file
-            .metadata()?
-            .len()
-            .pipe(|len| max(len, cap as u64))
-            .pipe(|len| self.file.set_len(len))?;
-
-        // SAFETY: type is safe to slice from bytes
-        unsafe {
-            self.base.ptr = self
-                .map(cap)?
-                .pipe(internal::safety_from_bytes_slice)
-                .into();
-        }
-
-        if capacity > self.base.allocated() {
-            unsafe {
-                self.base.handle_expand(capacity);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl<T: Default> RawMem<T> for FileMapped<T> {
-    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-        self.alloc_impl(capacity)?;
-
-        // SAFETY: `ptr` is valid slice
-        unsafe { self.base.ptr.as_mut().pipe(Ok) }
+    fn allocated(&self) -> &[Self::Item] {
+        unsafe { self.buf.as_slice() }
     }
 
-    fn allocated(&self) -> usize {
-        self.base.allocated()
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+        unsafe { self.buf.as_slice_mut() }
+    }
+
+    unsafe fn grow(
+        &mut self,
+        addition: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
+        // use layout to prevent all capacity bugs
+        let layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
+        let new_size = layout.size() as u64;
+
+        // unmap the file by calling `Drop` of `mmap`
+        let _ = self.mmap.take();
+
+        if self.file.metadata()?.len() < new_size {
+            self.file.set_len(new_size)?;
+        }
+
+        let ptr = unsafe {
+            let mmap = self.map_yet(new_size)?;
+            self.mmap.replace(mmap);
+            // we set it now: ^^^
+            NonNull::from(self.assume_mapped()) // it assume that `mmap` is some
+        };
+
+        Ok(self.buf.handle_fill(ptr.cast(), cap, fill))
+    }
+
+    fn shrink(&mut self, _: usize) -> Result<()> {
+        todo!()
     }
 }
 
 impl<T> Drop for FileMapped<T> {
     fn drop(&mut self) {
-        // SAFETY: `slice` is valid file piece
-        // `self.mapping` is initialized
-        // items is friendly to drop
         unsafe {
-            drop_in_place(self.base.ptr.as_mut());
-            ManuallyDrop::drop(&mut self.mapping);
+            ptr::drop_in_place(self.buf.as_slice_mut());
         }
 
-        let _: Result<_> = try {
-            self.file.sync_all()?;
-        };
+        let _ = self.file.sync_all();
     }
 }
 
-unsafe impl<T: Sync> Sync for FileMapped<T> {}
-
-unsafe impl<T: Send> Send for FileMapped<T> {}
+impl<T> fmt::Debug for FileMapped<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        utils::debug_mem(f, &self.buf, "FileMapped")?
+            .field("mmap", &self.mmap)
+            .field("file", &self.file)
+            .finish()
+    }
+}
