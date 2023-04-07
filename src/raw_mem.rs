@@ -79,7 +79,7 @@ pub trait RawMem {
         fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
-    /// [`grow`] which assumed that the memory is already initialized
+    /// [`grow`] which assumes that the memory is already initialized
     ///
     /// # Safety
     ///
