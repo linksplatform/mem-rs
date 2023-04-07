@@ -115,3 +115,28 @@ impl<T> fmt::Debug for FileMapped<T> {
             .finish()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use {super::*, std::io::Write};
+
+    #[test]
+    fn shrink_test() {
+        // let mut file = File::create("test.txt").unwrap();
+        // file.write_all(b"Hello, world!").unwrap();
+        // let mut file_mapped = FileMapped::new(file).unwrap();
+        // //make short file_mapped.grow
+        //
+        // unsafe {
+        //     file_mapped
+        //         .grow(10, |slice| {
+        //             for (i, item) in slice.iter_mut().enumerate() {
+        //                 *item = MaybeUninit::new(i as u8);
+        //             }
+        //         })
+        //         .unwrap();
+        // }
+        // file_mapped.shrink(5).unwrap();
+        // assert_eq!(file_mapped.allocated().len(), 5);
+    }
+}
