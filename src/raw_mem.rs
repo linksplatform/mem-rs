@@ -85,9 +85,9 @@ pub trait RawMem {
     ///
     /// When calling this method, you have to ensure that one of the following is true:
     ///
-    /// * memory already initialized as [`Self::Item`]
+    /// * memory already initialized as [`Item`]
     ///
-    /// * memory is initialized bytes and [`Self::Item`] can be represented as bytes
+    /// * memory is initialized bytes and [`Item`] can be represented as bytes
     ///
     /// # Examples
     ///
@@ -104,6 +104,7 @@ pub trait RawMem {
     /// ```
     ///
     /// [`grow`]: Self::grow
+    /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
         self.grow(cap, |_| {})
     }
