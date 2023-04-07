@@ -79,6 +79,31 @@ pub trait RawMem {
         fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
+    /// [`grow`] which assumed that the memory is already initialized
+    ///
+    /// # Safety
+    ///
+    /// When calling this method, you have to ensure that one of the following is true:
+    ///
+    /// * memory already initialized as [`Self::Item`]
+    ///
+    /// * memory is initialized bytes and [`Self::Item`] can be represented as bytes
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use platform_mem::{FileMapped, RawMem, Result};
+    ///
+    /// fn main() -> Result<()> {
+    ///     let mut  file = FileMapped::from_path("..")?;
+    ///     // file is always represents as initialized bytes
+    ///     // and usize is transparent as bytes
+    ///     let _: &mut [usize] = unsafe { file.grow_assumed(10)? };
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [`grow`]: Self::grow
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
         self.grow(cap, |_| {})
     }

@@ -1,6 +1,6 @@
 use {
     crate::{
-        debug_mem,
+        utils,
         Error::{AllocError, CapacityOverflow},
         RawMem, RawPlace, Result,
     },
@@ -78,12 +78,6 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
     }
 }
 
-impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        debug_mem(f, &self.buf, "Alloc")?.field("alloc", &self.alloc).finish()
-    }
-}
-
 impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
         unsafe {
@@ -95,11 +89,8 @@ impl<T, A: Allocator> Drop for Alloc<T, A> {
     }
 }
 
-// fixme: move into `lib.rs` for all `RawMem` implementors (or remove it as useless)
-fn _assert() {
-    use std::alloc::Global;
-
-    fn assert_sync_send<T: Sync + Send>() {}
-
-    assert_sync_send::<Alloc<(), Global>>();
+impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        utils::debug_mem(f, &self.buf, "Alloc")?.field("alloc", &self.alloc).finish()
+    }
 }

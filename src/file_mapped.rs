@@ -1,8 +1,9 @@
 use {
-    crate::{raw_place::RawPlace, Error::CapacityOverflow, RawMem, Result},
+    crate::{raw_place::RawPlace, utils, Error::CapacityOverflow, RawMem, Result},
     memmap2::{MmapMut, MmapOptions},
     std::{
         alloc::Layout,
+        fmt::{self, Formatter},
         fs::File,
         io,
         mem::MaybeUninit,
@@ -79,7 +80,7 @@ impl<T> RawMem for FileMapped<T> {
         Ok(self.buf.handle_fill(ptr.cast(), cap, fill))
     }
 
-    fn shrink(&mut self, cap: usize) -> Result<()> {
+    fn shrink(&mut self, _: usize) -> Result<()> {
         todo!()
     }
 }
@@ -91,5 +92,14 @@ impl<T> Drop for FileMapped<T> {
         }
 
         let _ = self.file.sync_all();
+    }
+}
+
+impl<T> fmt::Debug for FileMapped<T> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        utils::debug_mem(f, &self.buf, "FileMapped")?
+            .field("mmap", &self.mmap)
+            .field("file", &self.file)
+            .finish()
     }
 }
