@@ -82,16 +82,23 @@ impl<T> RawMem for FileMapped<T> {
 
     fn shrink(&mut self, cap: usize) -> Result<()> {
         let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
+        self.buf.shrink_to(cap);
 
         let _ = self.mmap.take();
 
-        // we can skip this checks because this memory layout is valid
-        // then smaller layout will also be valid
-        let new_size = unsafe { mem::size_of::<T>().unchecked_mul(cap) as u64 };
-        self.file.set_len(new_size)?;
+        let ptr = unsafe {
+            // we can skip this checks because this memory layout is valid
+            // then smaller layout will also be valid
+            let new_size = mem::size_of::<T>().unchecked_mul(cap) as u64;
+            self.file.set_len(new_size)?;
 
-        let mmap = self.map_yet(new_size)?;
-        self.mmap.replace(mmap);
+            let mmap = self.map_yet(new_size)?;
+            self.mmap.replace(mmap);
+
+            self.assume_mapped().into()
+        };
+
+        self.buf.set_ptr(ptr);
 
         Ok(())
     }
@@ -120,23 +127,21 @@ impl<T> fmt::Debug for FileMapped<T> {
 mod tests {
     use {super::*, std::io::Write};
 
+    fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
+    where
+        M::Item: Clone,
+    {
+        mem.grow_filled(4, val)?;
+        assert_eq!(mem.allocated().len(), 4);
+        mem.shrink(4)?;
+        assert_eq!(mem.allocated().len(), 0);
+        Ok(())
+    }
+
     #[test]
-    fn shrink_test() {
-        // let mut file = File::create("test.txt").unwrap();
-        // file.write_all(b"Hello, world!").unwrap();
-        // let mut file_mapped = FileMapped::new(file).unwrap();
-        // //make short file_mapped.grow
-        //
-        // unsafe {
-        //     file_mapped
-        //         .grow(10, |slice| {
-        //             for (i, item) in slice.iter_mut().enumerate() {
-        //                 *item = MaybeUninit::new(i as u8);
-        //             }
-        //         })
-        //         .unwrap();
-        // }
-        // file_mapped.shrink(5).unwrap();
-        // assert_eq!(file_mapped.allocated().len(), 5);
+    fn test_inner() -> Result<()> {
+        #[cfg(not(miri))]
+        inner(FileMapped::new(tempfile::tempfile()?)?, "test".to_string())?;
+        Ok(())
     }
 }
