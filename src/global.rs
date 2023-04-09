@@ -1,5 +1,5 @@
 use {
-    crate::{Alloc, RawMem, RawPlace, Result},
+    crate::{Alloc, RawMem, Result},
     std::{
         alloc::{self},
         mem::MaybeUninit,
@@ -38,23 +38,8 @@ impl<T> RawMem for Global<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
-    where
-        M::Item: Clone,
-    {
-        mem.grow_filled(10, val)?;
-        assert_eq!(mem.allocated().len(), 10);
-        mem.shrink(10)?;
-        assert_eq!(mem.allocated().len(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn for_globalg_test() -> Result<()> {
-        inner(Global::new(), "lol".to_string())?;
-        Ok(())
-    }
+#[test]
+fn for_global_test() -> Result<()> {
+    crate::tests::inner(Global::new(), "lol".to_string())?;
+    Ok(())
 }
