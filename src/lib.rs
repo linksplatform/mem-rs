@@ -1,9 +1,11 @@
-#![feature(allocator_api)]
-#![feature(unchecked_math)]
-#![feature(maybe_uninit_slice)]
-#![feature(slice_ptr_get)]
-#![feature(ptr_as_uninit)]
-//
+#![feature(
+    allocator_api,
+    unchecked_math,
+    maybe_uninit_slice,
+    slice_ptr_get,
+    ptr_as_uninit,
+    inline_const
+)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
