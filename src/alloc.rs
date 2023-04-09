@@ -5,7 +5,7 @@ use {
         RawMem, RawPlace, Result,
     },
     std::{
-        alloc::{Allocator, Layout},
+        alloc::{Allocator, Layout, System},
         fmt::{self, Debug, Formatter},
         mem::{self, MaybeUninit},
         ptr,
@@ -93,4 +93,10 @@ impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::debug_mem(f, &self.buf, "Alloc")?.field("alloc", &self.alloc).finish()
     }
+}
+
+#[test]
+fn for_both_test() -> Result<()> {
+    crate::tests::inner(Alloc::new(System), "lol".to_string())?;
+    Ok(())
 }
