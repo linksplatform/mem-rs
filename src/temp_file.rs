@@ -1,34 +1,42 @@
-use crate::{FileMapped, RawMem, Result};
-use std::{fs::File, io, path::Path};
+use {
+    crate::{FileMapped, RawMem, Result},
+    std::mem::MaybeUninit,
+};
 
-/// Same as [`FileMapped`], but only allows temporary files
-#[repr(transparent)]
 pub struct TempFile<T>(FileMapped<T>);
 
-impl<T: Default> TempFile<T> {
-    /// Constructs a new `TempFile` with temp file in [`std::env::temp_dir()`]
-    pub fn new() -> io::Result<Self> {
-        Self::from_file(tempfile::tempfile())
-    }
-
-    /// Constructs a new `TempFile` with temp file in the specified directory.
-    pub fn new_in<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        Self::from_file(tempfile::tempfile_in(path))
-    }
-
-    fn from_file(file: io::Result<File>) -> io::Result<Self> {
-        file.and_then(FileMapped::new).map(Self)
+impl<T> TempFile<T> {
+    pub fn new() -> Result<Self> {
+        Ok(Self(FileMapped::new(tempfile::tempfile()?)?))
     }
 }
 
-impl<T: Default> RawMem<T> for TempFile<T> {
-    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-        self.0.alloc(capacity)
-    }
+impl<T> RawMem for TempFile<T> {
+    type Item = T;
 
-    fn allocated(&self) -> usize {
+    fn allocated(&self) -> &[Self::Item] {
         self.0.allocated()
     }
 
-    // fixme: delegate all functions from `FileMapped`
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+        self.0.allocated_mut()
+    }
+
+    unsafe fn grow(
+        &mut self,
+        addition: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        self.0.grow(addition, fill)
+    }
+
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        self.0.shrink(cap)
+    }
+}
+
+#[test]
+fn for_temp_file_teпst() -> Result<()> {
+    crate::tests::inner(TempFile::new()?, "test".to_string())?;
+    Ok(())
 }
