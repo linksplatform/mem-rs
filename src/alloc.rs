@@ -95,23 +95,8 @@ impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
-    where
-        M::Item: Clone,
-    {
-        mem.grow_filled(10, val)?;
-        assert_eq!(mem.allocated().len(), 10);
-        mem.shrink(10)?;
-        assert_eq!(mem.allocated().len(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn for_both_test() -> Result<()> {
-        inner(Alloc::new(System), "lol".to_string())?;
-        Ok(())
-    }
+#[test]
+fn for_both_test() -> Result<()> {
+    crate::tests::inner(Alloc::new(System), "lol".to_string())?;
+    Ok(())
 }
