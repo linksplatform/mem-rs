@@ -148,6 +148,6 @@ fn miri() {
     inner(Global::new(), val.clone()).unwrap();
     inner(System::new(), val.clone()).unwrap();
 
-    #[cfg(not(miri))]
+    // #[cfg(not(miri))]
     inner(TempFile::new().unwrap(), val).unwrap();
 }
