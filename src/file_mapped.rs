@@ -123,25 +123,9 @@ impl<T> fmt::Debug for FileMapped<T> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use {super::*, std::io::Write};
-
-    fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
-    where
-        M::Item: Clone,
-    {
-        mem.grow_filled(4, val)?;
-        assert_eq!(mem.allocated().len(), 4);
-        mem.shrink(4)?;
-        assert_eq!(mem.allocated().len(), 0);
-        Ok(())
-    }
-
-    #[test]
-    fn test_inner() -> Result<()> {
-        #[cfg(not(miri))]
-        inner(FileMapped::new(tempfile::tempfile()?)?, "test".to_string())?;
-        Ok(())
-    }
+#[test]
+fn for_file_mapped_test() -> Result<()> {
+    #[cfg(not(miri))]
+    crate::tests::inner(FileMapped::new(tempfile::tempfile()?)?, "test".to_string())?;
+    Ok(())
 }
