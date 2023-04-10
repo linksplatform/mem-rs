@@ -8,6 +8,22 @@ use std::{
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
+
+struct Guard<'a, T> {
+    slice: &'a mut [MaybeUninit<T>],
+    init: usize,
+}
+
+impl<'a, T> Drop for Guard<'a, T> {
+    fn drop(&mut self) {
+        // SAFETY: this raw slice will contain only initialized objects
+        // that's why, it is allowed to drop it.
+        unsafe {
+            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(&mut self.slice[..self.init]));
+        }
+    }
+}
+
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `isize::MAX` bytes).
@@ -109,28 +125,27 @@ pub trait RawMem {
         self.grow(cap, |_| {})
     }
 
+    fn fill_with(&mut self, f: impl FnMut() -> Self::Item) -> Self::Item {
+        let allocated_mut = self.allocated_mut();
+        let uninit = unsafe { mem::transmute(allocated_mut) };
+        let mut guard = Guard { slice: uninit, init: 0 };
+        if let Some((last, elems)) = guard.slice.split_last_mut() {
+            for el in elems.iter_mut() {
+                el.write(f());
+                guard.init += 1;
+            }
+            last.write(f());
+            guard.init += 1;
+        }
+        mem::forget(guard);
+        f()
+    }
+
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
     {
         fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
-            struct Guard<'a, T> {
-                slice: &'a mut [MaybeUninit<T>],
-                init: usize,
-            }
-
-            impl<'a, T> Drop for Guard<'a, T> {
-                fn drop(&mut self) {
-                    // SAFETY: this raw slice will contain only initialized objects
-                    // that's why, it is allowed to drop it.
-                    unsafe {
-                        ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
-                            &mut self.slice[..self.init],
-                        ));
-                    }
-                }
-            }
-
             let mut guard = Guard { slice: uninit, init: 0 };
 
             if let Some((last, elems)) = guard.slice.split_last_mut() {
