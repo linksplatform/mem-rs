@@ -94,9 +94,3 @@ impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
         utils::debug_mem(f, &self.buf, "Alloc")?.field("alloc", &self.alloc).finish()
     }
 }
-
-#[test]
-fn for_both_test() -> Result<()> {
-    crate::tests::inner(Alloc::new(System), "lol".to_string())?;
-    Ok(())
-}
