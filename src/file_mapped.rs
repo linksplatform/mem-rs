@@ -122,10 +122,3 @@ impl<T> fmt::Debug for FileMapped<T> {
             .finish()
     }
 }
-
-#[test]
-fn for_file_mapped_test() -> Result<()> {
-    #[cfg(not(miri))]
-    crate::tests::inner(FileMapped::new(tempfile::tempfile()?)?, "test".to_string())?;
-    Ok(())
-}
