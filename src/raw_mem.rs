@@ -125,20 +125,23 @@ pub trait RawMem {
         self.grow(cap, |_| {})
     }
 
-    fn fill_with(&mut self, f: impl FnMut() -> Self::Item) -> Self::Item {
-        let allocated_mut = self.allocated_mut();
-        let uninit = unsafe { mem::transmute(allocated_mut) };
-        let mut guard = Guard { slice: uninit, init: 0 };
-        if let Some((last, elems)) = guard.slice.split_last_mut() {
-            for el in elems.iter_mut() {
+    fn grow_with(
+        &mut self,
+        addition: usize,
+        f: impl FnMut() -> Self::Item,
+    ) -> Result<&mut [Self::Item]> {
+        fn inner<T>(uninit: &mut [MaybeUninit<T>], mut f: impl FnMut() -> T) {
+            let guard = Guard { slice: uninit, init: 0 };
+            for el in guard.slice.iter_mut() {
                 el.write(f());
-                guard.init += 1;
             }
-            last.write(f());
-            guard.init += 1;
+            mem::forget(guard);
         }
-        mem::forget(guard);
-        f()
+        unsafe {
+            self.grow(addition, |uninit| {
+                inner(uninit, f);
+            })
+        }
     }
 
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
