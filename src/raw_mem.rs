@@ -1,7 +1,10 @@
-use std::{
-    alloc::Layout,
-    mem::{self, MaybeUninit},
-    ptr,
+use {
+    mem::size_of,
+    std::{
+        alloc::Layout,
+        mem::{self, MaybeUninit},
+        ptr,
+    },
 };
 
 /// Error memory allocation
@@ -65,7 +68,7 @@ pub enum Error {
 /// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait RawMem {
+pub trait RawMem<T> {
     type Item;
 
     fn allocated(&self) -> &[Self::Item];
@@ -142,6 +145,17 @@ pub trait RawMem {
                 inner(uninit, f);
             })
         }
+    }
+
+    unsafe fn grow_zeroed(
+        &mut self,
+        cap: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        self.grow(cap, |uninit| {
+            ptr::write_bytes(uninit.as_mut_ptr() as *mut u8, 0, uninit.len() * size_of::<T>());
+            fill(uninit);
+        })
     }
 
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
