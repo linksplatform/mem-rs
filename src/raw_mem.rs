@@ -134,10 +134,13 @@ pub trait RawMem<T> {
         f: impl FnMut() -> Self::Item,
     ) -> Result<&mut [Self::Item]> {
         fn inner<T>(uninit: &mut [MaybeUninit<T>], mut f: impl FnMut() -> T) {
-            let guard = Guard { slice: uninit, init: 0 };
+            let mut guard = Guard { slice: uninit, init: 0 };
+            
             for el in guard.slice.iter_mut() {
                 el.write(f());
+                guard.init += 1;
             }
+            
             mem::forget(guard);
         }
         unsafe {
