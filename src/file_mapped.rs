@@ -6,7 +6,7 @@ use {
         fmt::{self, Formatter},
         fs::File,
         io,
-        mem::MaybeUninit,
+        mem::{self, MaybeUninit},
         path::Path,
         ptr::{self, NonNull},
     },
@@ -80,8 +80,27 @@ impl<T> RawMem for FileMapped<T> {
         Ok(self.buf.handle_fill(ptr.cast(), cap, fill))
     }
 
-    fn shrink(&mut self, _: usize) -> Result<()> {
-        todo!()
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
+        self.buf.shrink_to(cap);
+
+        let _ = self.mmap.take();
+
+        let ptr = unsafe {
+            // we can skip this checks because this memory layout is valid
+            // then smaller layout will also be valid
+            let new_size = mem::size_of::<T>().unchecked_mul(cap) as u64;
+            self.file.set_len(new_size)?;
+
+            let mmap = self.map_yet(new_size)?;
+            self.mmap.replace(mmap);
+
+            self.assume_mapped().into()
+        };
+
+        self.buf.set_ptr(ptr);
+
+        Ok(())
     }
 }
 
@@ -102,4 +121,11 @@ impl<T> fmt::Debug for FileMapped<T> {
             .field("file", &self.file)
             .finish()
     }
+}
+
+#[test]
+fn for_file_mapped_test() -> Result<()> {
+    #[cfg(not(miri))]
+    crate::tests::inner(FileMapped::new(tempfile::tempfile()?)?, "test".to_string())?;
+    Ok(())
 }
