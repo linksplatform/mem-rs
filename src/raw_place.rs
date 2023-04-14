@@ -16,6 +16,13 @@ pub struct RawPlace<T> {
 
 impl<T> RawPlace<T> {
     pub const fn dangling() -> Self {
+        // fixme: ZST correctness isn't checked now
+        const { assert!(mem::size_of::<T>() != 0) };
+        // rust does not support types,
+        // so we can do better by skipping some checks and avoid an unwrap.
+        // this applies to `current_memory()`
+        const { assert!(mem::size_of::<T>() % mem::align_of::<T>() == 0) };
+
         Self { ptr: NonNull::dangling(), len: 0, cap: 0, _marker: PhantomData }
     }
 
@@ -79,13 +86,20 @@ impl<T> RawPlace<T> {
     }
 
     pub fn set_ptr(&mut self, ptr: NonNull<[u8]>) {
+        debug_assert_eq!(
+            ptr.len(),
+            self.cap * mem::size_of::<T>(),
+            "Usually you have to call `.shrink_to` first to drop shrunk memory, \
+             this should be followed by a call to `.set_ptr`."
+        );
+
         self.ptr = ptr.cast();
     }
 }
 
 impl<T> fmt::Debug for RawPlace<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "({:?}..{})", self.ptr, self.cap)
+        write!(f, "({:?}::{})", self.ptr, self.cap)
     }
 }
 
