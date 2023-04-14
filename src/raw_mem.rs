@@ -1,8 +1,4 @@
-use std::{
-    alloc::Layout,
-    mem::{self, MaybeUninit},
-    ptr,
-};
+use std::{alloc::Layout, mem::MaybeUninit};
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
@@ -49,24 +45,6 @@ pub enum Error {
 /// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
-struct Guard<'a, T> {
-    slice: &'a mut [MaybeUninit<T>],
-    init: usize,
-}
-
-impl<T> Drop for Guard<'_, T> {
-    fn drop(&mut self) {
-        debug_assert!(self.init <= self.slice.len());
-        // SAFETY: this raw slice will contain only initialized objects
-        // that's why, it is allowed to drop it.
-        unsafe {
-            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
-                self.slice.get_unchecked_mut(..self.init),
-            ));
-        }
-    }
-}
-
 pub trait RawMem {
     type Item;
 
@@ -97,7 +75,7 @@ pub trait RawMem {
     unsafe fn grow(
         &mut self,
         cap: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+        fill: impl FnOnce(usize, &mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
     /// [`grow`] which assumes that the memory is already initialized
@@ -126,7 +104,16 @@ pub trait RawMem {
     /// [`grow`]: Self::grow
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |_| {})
+        self.grow(cap, |inited, uninit| {
+            debug_assert_eq!(
+                // fixme: maybe change it to `assert_eq!`
+                inited,
+                uninit.len(),
+                "grown memory must be initialized, \
+                 usually allocators-like provide uninitialized memory, \
+                 which is only safe for writing"
+            )
+        })
     }
 
     /// # Safety
@@ -166,7 +153,7 @@ pub trait RawMem {
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |uninit| {
+        self.grow(cap, |_, uninit| {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
@@ -176,19 +163,9 @@ pub trait RawMem {
         addition: usize,
         f: impl FnMut() -> Self::Item,
     ) -> Result<&mut [Self::Item]> {
-        fn inner<T>(uninit: &mut [MaybeUninit<T>], mut fill: impl FnMut() -> T) {
-            let mut guard = Guard { slice: uninit, init: 0 };
-
-            for el in guard.slice.iter_mut() {
-                el.write(fill());
-                guard.init += 1;
-            }
-
-            mem::forget(guard);
-        }
         unsafe {
-            self.grow(addition, |uninit| {
-                inner(uninit, f);
+            self.grow(addition, |_, uninit| {
+                uninit::fill_with(uninit, f);
             })
         }
     }
@@ -197,27 +174,60 @@ pub trait RawMem {
     where
         Self::Item: Clone,
     {
-        fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
-            let mut guard = Guard { slice: uninit, init: 0 };
-
-            if let Some((last, elems)) = guard.slice.split_last_mut() {
-                for el in elems.iter_mut() {
-                    el.write(val.clone());
-                    guard.init += 1;
-                }
-                last.write(val);
-                guard.init += 1;
-            }
-
-            mem::forget(guard);
-        }
-
         unsafe {
-            self.grow(cap, |uninit| {
-                uninit_fill(uninit, value);
+            self.grow(cap, |_, uninit| {
+                uninit::fill(uninit, value);
             })
         }
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()>;
+}
+
+pub mod uninit {
+    use std::{mem, mem::MaybeUninit, ptr};
+
+    pub fn fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
+        let mut guard = Guard { slice: uninit, init: 0 };
+
+        if let Some((last, elems)) = guard.slice.split_last_mut() {
+            for el in elems.iter_mut() {
+                el.write(val.clone());
+                guard.init += 1;
+            }
+            last.write(val);
+            guard.init += 1;
+        }
+
+        mem::forget(guard);
+    }
+
+    pub fn fill_with<T>(uninit: &mut [MaybeUninit<T>], mut fill: impl FnMut() -> T) {
+        let mut guard = Guard { slice: uninit, init: 0 };
+
+        for el in guard.slice.iter_mut() {
+            el.write(fill());
+            guard.init += 1;
+        }
+
+        mem::forget(guard);
+    }
+
+    struct Guard<'a, T> {
+        slice: &'a mut [MaybeUninit<T>],
+        init: usize,
+    }
+
+    impl<T> Drop for Guard<'_, T> {
+        fn drop(&mut self) {
+            debug_assert!(self.init <= self.slice.len());
+            // SAFETY: this raw slice will contain only initialized objects
+            // that's why, it is allowed to drop it.
+            unsafe {
+                ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
+                    self.slice.get_unchecked_mut(..self.init),
+                ));
+            }
+        }
+    }
 }

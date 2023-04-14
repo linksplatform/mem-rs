@@ -55,9 +55,9 @@ impl<T> RawPlace<T> {
 
     pub unsafe fn handle_fill(
         &mut self,
-        ptr: NonNull<T>,
-        cap: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<T>]),
+        (ptr, cap): (NonNull<T>, usize),
+        inited: usize,
+        fill: impl FnOnce(usize, &mut [MaybeUninit<T>]),
     ) -> &mut [T] {
         let uninit = NonNull::slice_from_raw_parts(ptr, cap)
             .get_unchecked_mut(self.cap..)
@@ -67,7 +67,7 @@ impl<T> RawPlace<T> {
         self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
         //                 ( alloc memory )
 
-        fill(uninit); // panic out!
+        fill(inited, uninit); // panic out!
 
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 
