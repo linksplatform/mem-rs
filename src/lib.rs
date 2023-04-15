@@ -132,13 +132,15 @@ fn miri() {
     where
         M::Item: Clone,
     {
-        for _ in 0..10 {
-            mem.grow_filled(10, val.clone())?;
-        }
-        assert_eq!(mem.allocated().len(), 100);
+        const GROW: usize = if cfg!(miri) { 100 } else { 10_000 };
 
         for _ in 0..10 {
-            mem.shrink(10)?;
+            mem.grow_filled(GROW, val.clone())?;
+        }
+        assert_eq!(mem.allocated().len(), GROW * 10);
+
+        for _ in 0..10 {
+            mem.shrink(GROW)?;
         }
         assert_eq!(mem.allocated().len(), 0);
 
