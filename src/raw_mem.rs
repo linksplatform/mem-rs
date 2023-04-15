@@ -197,19 +197,37 @@ pub trait RawMem {
     where
         Self::Item: Clone,
     {
-        fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
-            let mut guard = Guard { slice: uninit, init: 0 };
+        trait SpecFill<T> {
+            fn fill(&mut self, val: T);
+        }
 
-            if let Some((last, elems)) = guard.slice.split_last_mut() {
-                for el in elems.iter_mut() {
-                    el.write(val.clone());
+        impl<T: Clone> SpecFill<T> for [MaybeUninit<T>] {
+            default fn fill(&mut self, val: T) {
+                let mut guard = Guard { slice: self, init: 0 };
+
+                if let Some((last, elems)) = guard.slice.split_last_mut() {
+                    for el in elems {
+                        el.write(val.clone());
+                        guard.init += 1;
+                    }
+                    last.write(val);
                     guard.init += 1;
                 }
-                last.write(val);
-                guard.init += 1;
-            }
 
-            mem::forget(guard);
+                mem::forget(guard);
+            }
+        }
+
+        impl<T: Copy> SpecFill<T> for [MaybeUninit<T>] {
+            fn fill(&mut self, val: T) {
+                for item in self {
+                    item.write(val);
+                }
+            }
+        }
+
+        fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
+            SpecFill::fill(uninit, val);
         }
 
         unsafe {
