@@ -130,14 +130,14 @@ impl<T> Default for System<T> {
 fn miri() {
     pub fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
     where
-        M::Item: Clone,
+        M::Item: Clone + PartialEq,
     {
         const GROW: usize = if cfg!(miri) { 100 } else { 10_000 };
 
         for _ in 0..10 {
             mem.grow_filled(GROW, val.clone())?;
         }
-        assert_eq!(mem.allocated().len(), GROW * 10);
+        assert!(mem.allocated() == vec![val; GROW * 10]);
 
         for _ in 0..10 {
             mem.shrink(GROW)?;
