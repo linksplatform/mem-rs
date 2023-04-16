@@ -4,14 +4,14 @@
     maybe_uninit_slice,
     slice_ptr_get,
     ptr_as_uninit,
-    inline_const
+    inline_const,
+    min_specialization
 )]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
 #![deny(unused_must_use)]
 #![warn(missing_debug_implementations)]
-#![feature(min_specialization)]
 
 mod alloc;
 mod file_mapped;
