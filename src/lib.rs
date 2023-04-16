@@ -11,6 +11,7 @@
 // rust compiler lints
 #![deny(unused_must_use)]
 #![warn(missing_debug_implementations)]
+#![feature(min_specialization)]
 
 mod alloc;
 mod file_mapped;
