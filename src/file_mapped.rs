@@ -33,6 +33,7 @@ impl<T> FileMapped<T> {
         File::options().create(true).read(true).write(true).open(path).and_then(Self::new)
     }
 
+    // `cap` should always less than `usize::MAX`
     fn map_yet(&mut self, cap: u64) -> io::Result<MmapMut> {
         unsafe { MmapOptions::new().len(cap as usize).map_mut(&self.file) }
     }
