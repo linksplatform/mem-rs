@@ -185,7 +185,7 @@ pub trait RawMem {
     /// };
     /// assert_eq!(res, [(2, 2); 10]);
     /// # Ok::<_, Error>(())
-    /// ```п
+    /// ```
     fn grow_with(
         &mut self,
         addition: usize,
