@@ -65,7 +65,13 @@ impl<T> RawMem for FileMapped<T> {
     fn allocated(&self) -> &[Self::Item] {
         unsafe { self.buf.as_slice() }
     }
-
+    /// Returns a mutable slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// let slice = file_mapped.allocated_mut();
+    /// ```
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
         unsafe { self.buf.as_slice_mut() }
     }
