@@ -70,7 +70,18 @@ impl<T> Drop for Guard<'_, T> {
 pub trait RawMem {
     type Item;
 
+    /// Returns a slice of the allocated memory.
+    /// # Examples
+    ///```
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// alloc.grow_with(10, Default::default)?;
+    /// assert_eq!(alloc.allocated().len(), 10);
+    /// ```
+
     fn allocated(&self) -> &[Self::Item];
+
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
