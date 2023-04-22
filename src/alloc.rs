@@ -31,11 +31,23 @@ impl<T, A: Allocator> Alloc<T, A> {
 
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
-
+    /// Returns a slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// let slice = alloc.allocated();
+    /// ```
     fn allocated(&self) -> &[Self::Item] {
         unsafe { self.buf.as_slice() }
     }
-
+    /// Returns a mutable slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// let slice = alloc.allocated_mut();
+    /// ```
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
         unsafe { self.buf.as_slice_mut() }
     }
