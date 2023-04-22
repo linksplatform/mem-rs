@@ -81,7 +81,15 @@ pub trait RawMem {
     /// ```
 
     fn allocated(&self) -> &[Self::Item];
-
+    /// Returns a mutable slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// alloc.grow_with(10, Default::default)?;
+    /// assert_eq!(alloc.allocated_mut().len(), 10);
+    /// ```
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
