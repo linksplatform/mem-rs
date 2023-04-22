@@ -55,7 +55,13 @@ impl<T> FileMapped<T> {
 
 impl<T> RawMem for FileMapped<T> {
     type Item = T;
-
+    /// Returns a slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// let slice = file_mapped.allocated();
+    /// ```
     fn allocated(&self) -> &[Self::Item] {
         unsafe { self.buf.as_slice() }
     }
