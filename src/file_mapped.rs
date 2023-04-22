@@ -34,7 +34,12 @@ impl<T> FileMapped<T> {
 
         Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
     }
-
+    /// Creates a new `FileMapped` with the given file path.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::from_path("test.txt");
+    /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         File::options().create(true).read(true).write(true).open(path).and_then(Self::new)
     }
