@@ -112,6 +112,13 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
 }
 
 impl<T, A: Allocator> Drop for Alloc<T, A> {
+    /// Deallocates the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// drop(alloc);
+    /// ```
     fn drop(&mut self) {
         unsafe {
             if let Some((ptr, layout)) = self.buf.current_memory() {
