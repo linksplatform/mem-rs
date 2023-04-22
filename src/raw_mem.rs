@@ -266,6 +266,34 @@ pub trait RawMem {
             })
         }
     }
-
+    /// Shrinks the capacity of the allocated memory to `cap`.
+    /// # Panics
+    /// Panics if `cap` is greater than the allocated memory's current capacity.
+    ///
+    /// ```
+    /// should_panic
+    ///
+    /// # use platform_mem::Result;
+    /// use platform_mem::{Alloc, RawMem};
+    ///
+    /// let mut mem = Global::new();
+    /// mem.grow(10, Default::default)?;
+    /// mem.shrink(15)?;
+    /// assert_eq!(mem.allocated().len(), 10);
+    /// # Result::Ok(())
+    /// ```
+    /// # Examples
+    ///
+    /// ```
+    /// # use platform_mem::Result;
+    /// use platform_mem::{Alloc, RawMem};
+    ///
+    /// let mut mem = Global::new();
+    /// mem.grow(10, Default::default)?;
+    /// mem.shrink(5)?;
+    ///
+    /// assert_eq!(mem.allocated().len(), 5);
+    /// # Result::Ok(())
+    /// ```
     fn shrink(&mut self, cap: usize) -> Result<()>;
 }
