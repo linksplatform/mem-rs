@@ -19,6 +19,12 @@ pub struct FileMapped<T> {
 }
 
 impl<T> FileMapped<T> {
+    /// Creates a new `FileMapped` with the given file.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// ```
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 
