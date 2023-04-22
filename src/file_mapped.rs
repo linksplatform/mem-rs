@@ -102,7 +102,13 @@ impl<T> RawMem for FileMapped<T> {
 
         Ok(self.buf.handle_fill(ptr.cast(), cap, fill))
     }
-
+    /// Shrinks the capacity of the allocated memory to `cap`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// file_mapped.shrink(1);
+    /// ```
     fn shrink(&mut self, cap: usize) -> Result<()> {
         let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
         self.buf.shrink_to(cap);
