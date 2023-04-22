@@ -171,7 +171,6 @@ pub trait RawMem {
         })
     }
     /// [`grow`] which fills grown memory with elements returned by calling a closure repeatedly.
-    ///
     /// # Examples
     /// ```
     /// # #![feature(allocator_api)]
