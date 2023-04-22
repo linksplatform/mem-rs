@@ -134,6 +134,13 @@ impl<T> RawMem for FileMapped<T> {
 }
 
 impl<T> Drop for FileMapped<T> {
+    /// Drops the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// drop(file_mapped);
+    /// ```
     fn drop(&mut self) {
         unsafe {
             ptr::drop_in_place(self.buf.as_slice_mut());
