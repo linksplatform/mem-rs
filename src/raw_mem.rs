@@ -204,7 +204,25 @@ pub trait RawMem {
             })
         }
     }
-
+    /// [`grow`] which fills grown memory with elements by cloning `value`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #![feature(allocator_api)]
+    /// # use platform_mem::Error;
+    /// use platform_mem::{Global, RawMem};
+    ///
+    /// let mut mem = Global::new();
+    /// mem.grow_filled(10, String::from("hello"))?;
+    ///
+    /// assert_eq!(mem.allocated(), ["hello"; 10]);
+    ///
+    /// # Ok::<_, Error>(())
+    ///
+    /// ```
+    /// [`grow`]: Self::grow
+    ///
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
