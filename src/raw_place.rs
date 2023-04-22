@@ -31,7 +31,13 @@ impl<T> RawPlace<T> {
 
         Self { ptr: NonNull::dangling(), len: 0, cap: 0, _marker: PhantomData }
     }
-
+    /// Return a capacity of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// assert_eq!(place.cap(), 0);
+    /// ```
     pub fn cap(&self) -> usize {
         self.cap
     }
