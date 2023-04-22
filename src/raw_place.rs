@@ -15,6 +15,12 @@ pub struct RawPlace<T> {
 }
 
 impl<T> RawPlace<T> {
+    /// Creates a new `RawPlace` with the given pointer and capacity.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// ```
     pub const fn dangling() -> Self {
         // fixme: ZST correctness isn't checked now
         const { assert!(mem::size_of::<T>() != 0) };
