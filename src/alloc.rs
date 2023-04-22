@@ -70,7 +70,22 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
 
         Ok(self.buf.handle_fill(ptr, cap, fill))
     }
-
+    /// Shrinks the capacity of the allocated memory to `cap`.
+    /// # Panics
+    /// Panics if `cap` is larger than the current capacity.
+    /// ```
+    /// should_panic
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// alloc.shrink(1);
+    /// ```
+    ///
+    /// # Examples
+    /// ```
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// alloc.shrink(0);
+    /// ```
     fn shrink(&mut self, cap: usize) -> Result<()> {
         let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
 
