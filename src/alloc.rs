@@ -18,6 +18,12 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T, A: Allocator> Alloc<T, A> {
+    /// Creates a new `Alloc` with the given allocator.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{Global};
+    /// let mut alloc = Global::new();
+    /// ```
     pub const fn new(alloc: A) -> Self {
         Self { buf: RawPlace::dangling(), alloc }
     }
