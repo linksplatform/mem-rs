@@ -5,7 +5,8 @@
     slice_ptr_get,
     ptr_as_uninit,
     inline_const,
-    min_specialization
+    min_specialization,
+    maybe_uninit_write_slice
 )]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
@@ -155,4 +156,30 @@ fn miri() {
 
     #[cfg(not(miri))]
     inner(TempFile::new().unwrap(), val).unwrap();
+}
+
+macro_rules! define_test {
+    ($($case:expr);+ $(;)? => ($name:ident) $body:expr) => {
+        $({
+            let _ = (|| -> std::result::Result<(), Box<dyn std::error::Error>> {
+                let mut $name = $case;
+                Ok($body)
+            })();
+        })+
+    };
+}
+
+#[test]
+fn grow_from_slice() {
+    // fixme: use macros to defines all generic tests
+    define_test!(
+        {
+            #[cfg(not(miri))]
+            TempFile::new().unwrap()
+        };
+        System::new();
+        Global::new() => (mem) {
+            assert_eq!(b"hello world", mem.grow_from_slice(b"hello world")?);
+        }
+    );
 }
