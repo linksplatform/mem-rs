@@ -241,7 +241,6 @@ pub trait RawMem {
     ///
     /// ```
     /// [`grow`]: Self::grow
-    ///
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -316,6 +315,5 @@ pub trait RawMem {
     /// assert_eq!(mem.allocated(), [0u8; 7]);
     /// # Result::Ok(())
     /// ```
-    ///
     fn shrink(&mut self, cap: usize) -> Result<()>;
 }
