@@ -248,5 +248,11 @@ pub trait RawMem {
         }
     }
 
+    #[track_caller] // in currently implementation `shrink` will panic when `cap` > available memory
     fn shrink(&mut self, cap: usize) -> Result<()>;
+
+    fn shrink_to(&mut self, cap: usize) -> Result<()> {
+        // if `cap` > available memory `shrink` must check it
+        self.shrink(self.allocated().len().wrapping_sub(cap))
+    }
 }
