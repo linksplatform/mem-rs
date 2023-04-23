@@ -91,7 +91,6 @@ impl<T> RawPlace<T> {
 
         MaybeUninit::slice_assume_init_mut(uninit)
     }
-
     pub fn shrink_to(&mut self, cap: usize) {
         assert!(cap <= self.cap);
 
@@ -102,7 +101,13 @@ impl<T> RawPlace<T> {
         self.cap = cap;
         self.len = cap;
     }
-
+    /// Set a pointer of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// place.set_ptr(NonNull::dangling());
+    /// ```
     pub fn set_ptr(&mut self, ptr: NonNull<[u8]>) {
         debug_assert_eq!(
             ptr.len(),
