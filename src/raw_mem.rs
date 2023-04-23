@@ -285,34 +285,37 @@ pub trait RawMem {
             })
         }
     }
-    /// Shrinks the capacity of the allocated memory to `cap`.
-    /// # Panics
-    /// Panics if `cap` is greater than the allocated memory's current capacity.
+
+    // fixme(modern-api-provides): use `grow_from_slice` in example
+    /// Attempts to shrink the last `cap` elements
     ///
-    /// ```
-    /// should_panic
+    /// Keep in mind that [`shrink`] implies a memory shrink. For example:
+    /// - [`Alloc`] uses [`Allocator::shrink`], which almost always causes reallocation
+    /// - [`FileMapped`] implementation shrinks a file instead of changing inner capacity.
     ///
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
+    /// # Errors
     ///
-    /// let mut mem = Global::new();
-    /// mem.grow(10, Default::default)?;
-    /// mem.shrink(15)?;
-    /// assert_eq!(mem.allocated().len(), 10);
-    /// # Result::Ok(())
-    /// ```
+    /// Default implementations panicking if `cap` less than available memory.
+    /// This is not the final behavior, perhaps in the future an error type will be added for this
+    /// (or [`Error::CapacityOverflow`] will be used)
+    ///
+    /// [`Allocator::shrink`]: std::alloc::Allocator::shrink
+    /// [`FileMapped`]: crate::FileMapped
+    /// [`shrink`]: Self::shrink
+    /// [`Alloc`]: crate::Alloc
+    ///
     /// # Examples
     ///
     /// ```
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
-    ///
+    /// # use platform_mem::{Global, RawMem, Result};
     /// let mut mem = Global::new();
-    /// mem.grow(10, Default::default)?;
-    /// mem.shrink(5)?;
     ///
-    /// assert_eq!(mem.allocated().len(), 5);
+    /// mem.grow_filled(10, 0)?;
+    /// mem.shrink(3)?;
+    ///
+    /// assert_eq!(mem.allocated(), [0u8; 7]);
     /// # Result::Ok(())
     /// ```
+    ///
     fn shrink(&mut self, cap: usize) -> Result<()>;
 }
