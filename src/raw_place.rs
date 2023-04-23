@@ -49,8 +49,14 @@ impl<T> RawPlace<T> {
     pub unsafe fn as_slice_mut(&mut self) -> &mut [T] {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
     }
-
     // we change `ptr`/`cap` only in provided functions, so it's safe
+    /// Return a pointer and layout of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// assert_eq!(place.current_memory(), None);
+    /// ```
     pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         if self.cap == 0 {
             None
