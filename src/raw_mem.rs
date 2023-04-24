@@ -84,13 +84,10 @@ pub trait RawMem {
     ///
     /// ### Incorrect usage
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    /// # use std::alloc::Global;
     /// # use std::mem::MaybeUninit;
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
+    /// # use platform_mem::{Result, Global, RawMem};
     ///
-    /// let mut alloc = Alloc::new(Global);
+    /// let mut alloc = Global::new();
     /// unsafe {
     ///     alloc.grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
     ///         // `RawMem` relies on the fact that we initialize memory
