@@ -70,26 +70,8 @@ impl<T> Drop for Guard<'_, T> {
 pub trait RawMem {
     type Item;
 
-    /// Returns a slice of the allocated memory.
-    /// # Examples
-    ///```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// alloc.grow_with(10, Default::default)?;
-    /// assert_eq!(alloc.allocated().len(), 10);
-    /// ```
-
     fn allocated(&self) -> &[Self::Item];
-    /// Returns a mutable slice of the allocated memory.
-    /// # Examples
-    /// ```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// alloc.grow_with(10, Default::default)?;
-    /// assert_eq!(alloc.allocated_mut().len(), 10);
-    /// ```
+
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
@@ -189,16 +171,18 @@ pub trait RawMem {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
+
     /// [`grow`] which fills grown memory with elements returned by calling a closure repeatedly.
-    /// # Examples
-    /// ```
-    /// # #![feature(allocator_api)]
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
     ///
-    /// let mut mem = Global::new();
-    /// mem.grow_with(10, Default::default)?;
-    /// assert_eq!(mem.allocated().len(), 10);
+    /// # Examples
+    ///
+    /// It's possible to use it like potential `grow_default` with [`Default::default`]
+    /// ```
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// let mut alloc = Global::new();
+    ///
+    /// let default = alloc.grow_with(10, <f32>::default)?;
+    /// assert_eq!(default, [0.0; 10]);
     /// # Result::Ok(())
     /// ```
     /// [`grow`]: Self::grow
@@ -228,17 +212,13 @@ pub trait RawMem {
     /// # Examples
     ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// # use platform_mem::Error;
-    /// use platform_mem::{Global, RawMem};
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// let mut alloc = Global::new();
     ///
-    /// let mut mem = Global::new();
-    /// mem.grow_filled(10, String::from("hello"))?;
+    /// let filled = alloc.grow_filled(10, String::from("hello"))?;
+    /// assert_eq!(filled, ["hello"; 10]);
     ///
-    /// assert_eq!(mem.allocated(), ["hello"; 10]);
-    ///
-    /// # Ok::<_, Error>(())
-    ///
+    /// # Result::Ok(())
     /// ```
     /// [`grow`]: Self::grow
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
