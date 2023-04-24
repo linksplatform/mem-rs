@@ -158,7 +158,7 @@ pub trait RawMem {
     /// use platform_mem::{Global, RawMem};
     ///
     /// let mut alloc = Global::new();
-    /// let zeroes: &mut [&'static str] = unsafe {
+    /// let _: &mut [&'static str] = unsafe {
     ///     alloc.grow_zeroed(10)? // Undefined behavior!
     /// };
     ///
