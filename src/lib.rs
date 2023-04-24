@@ -95,7 +95,7 @@ delegate_memory! {
         }
     }
    System<T>(Alloc<T, SystemAlloc>) {
-       pub fn new() -> Self {
+       pub const fn new() -> Self {
            Self(Alloc::new(SystemAlloc))
        }
    }
