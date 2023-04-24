@@ -33,9 +33,8 @@ impl<T> RawPlace<T> {
 
     // we change `ptr`/`cap` only in provided functions, so it's safe
     pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
-        // rust does not support types,
+        // rust does not support such types,
         // so we can do better by skipping some checks and avoid an unwrap.
-        // this applies to `current_memory()`
         const { assert!(mem::size_of::<T>() % mem::align_of::<T>() == 0) };
 
         if self.cap == 0 {
@@ -57,7 +56,8 @@ impl<T> RawPlace<T> {
         cap: usize,
         fill: impl FnOnce(&mut [MaybeUninit<T>]),
     ) -> &mut [T] {
-        // fixme: ZST correctness isn't checked now
+        // fixme: ZST correctness isn't checked now,
+        // it forbid growing, but allow `RawPlace::<ZST>::dangling` and thus `Alloc::<ZST>::new`'s
         const { assert!(mem::size_of::<T>() != 0) };
 
         let uninit = NonNull::slice_from_raw_parts(ptr, cap)
