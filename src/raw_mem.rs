@@ -4,8 +4,12 @@ use std::{
     ptr,
 };
 
-/// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
+/// The `Error` error indicates [*growing*]/[*shrinking*] failure of the [`RawMem`]
+/// that may be due by implementation details. E.g allocation failure or I/O error
+///
+/// [*growing*]: RawMem::grow
+/// [*shrinking*]: RawMem::shrink
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -17,13 +21,13 @@ pub enum Error {
     /// grow more than `isize::MAX` bytes:
     ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// # #![feature(assert_matches)]
-    /// # use std::alloc::Global;
-    /// # use std::assert_matches::assert_matches;
-    /// # use platform_mem::{Error, Alloc, RawMem};
-    /// let mut mem = Alloc::new(Global);
-    /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
+    /// # use platform_mem::{Error, Alloc, RawMem, Global};
+    /// let mut alloc = Global::new();
+    ///
+    /// match alloc.grow_filled(usize::MAX, 0u64) {
+    ///     Err(Error::CapacityOverflow) => {}
+    ///     _ => unreachable!()
+    /// }
     /// ```
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
