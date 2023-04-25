@@ -158,13 +158,18 @@ fn miri() {
     inner(TempFile::new().unwrap(), val).unwrap();
 }
 
+#[cfg(test)]
 macro_rules! define_test {
-    ($($case:expr);+ $(;)? => ($name:ident) $body:expr) => {
-        $({
-            let _ = (|| -> std::result::Result<(), Box<dyn std::error::Error>> {
+    ($($(not($miri:ident))? => $case:expr);+ $(;)? => ($name:ident) $body:expr) => {
+        $(#[allow(unused)] {
+            use std::{result::Result, error::Error};
+            $(
+                #[cfg(not($miri))]
+            )?
+            (|| -> Result<(), Box<dyn Error>> {
                 let mut $name = $case;
                 Ok($body)
-            })();
+            })().unwrap();
         })+
     };
 }
@@ -173,13 +178,11 @@ macro_rules! define_test {
 fn grow_from_slice() {
     // fixme: use macros to defines all generic tests
     define_test!(
-        {
-            #[cfg(not(miri))]
-            TempFile::new().unwrap()
-        };
-        System::new();
-        Global::new() => (mem) {
+         not(miri) => TempFile::new().unwrap();
+         => System::new();
+         => Global::new() => (mem) {
             assert_eq!(b"hello world", mem.grow_from_slice(b"hello world")?);
+            assert_eq!(b"hello world", mem.allocated());
         }
     );
 }
