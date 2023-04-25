@@ -1,25 +1,13 @@
-use std::{alloc::Layout, mem::MaybeUninit};
+use std::{
+    alloc::Layout,
+    mem::{self, MaybeUninit},
+    ptr,
+};
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
-
-struct Guard<'a, T> {
-    slice: &'a mut [MaybeUninit<T>],
-    init: usize,
-}
-
-impl<'a, T> Drop for Guard<'a, T> {
-    fn drop(&mut self) {
-        // SAFETY: this raw slice will contain only initialized objects
-        // that's why, it is allowed to drop it.
-        unsafe {
-            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(&mut self.slice[..self.init]));
-        }
-    }
-}
-
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `isize::MAX` bytes).
@@ -61,7 +49,25 @@ pub enum Error {
 /// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait RawMem<T> {
+struct Guard<'a, T> {
+    slice: &'a mut [MaybeUninit<T>],
+    init: usize,
+}
+
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        debug_assert!(self.init <= self.slice.len());
+        // SAFETY: this raw slice will contain only initialized objects
+        // that's why, it is allowed to drop it.
+        unsafe {
+            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
+                self.slice.get_unchecked_mut(..self.init),
+            ));
+        }
+    }
+}
+
+pub trait RawMem {
     type Item;
 
     fn allocated(&self) -> &[Self::Item];
@@ -91,7 +97,7 @@ pub trait RawMem<T> {
     unsafe fn grow(
         &mut self,
         cap: usize,
-        fill: impl FnOnce(usize, &mut [MaybeUninit<Self::Item>]),
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
     ) -> Result<&mut [Self::Item]>;
 
     /// [`grow`] which assumes that the memory is already initialized
@@ -120,16 +126,7 @@ pub trait RawMem<T> {
     /// [`grow`]: Self::grow
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |inited, uninit| {
-            debug_assert_eq!(
-                // fixme: maybe change it to `assert_eq!`
-                inited,
-                uninit.len(),
-                "grown memory must be initialized, \
-                 usually allocators-like provide uninitialized memory, \
-                 which is only safe for writing"
-            )
-        })
+        self.grow(cap, |_| {})
     }
 
     /// # Safety
@@ -161,7 +158,7 @@ pub trait RawMem<T> {
     /// use platform_mem::{Global, RawMem};
     ///
     /// let mut alloc = Global::new();
-    /// let zeroes: &mut [&'static str] = unsafe {
+    /// let _: &mut [&'static str] = unsafe {
     ///     alloc.grow_zeroed(10)? // Undefined behavior!
     /// };
     ///
@@ -169,36 +166,39 @@ pub trait RawMem<T> {
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |_, uninit| {
+        self.grow(cap, |uninit| {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
-
+    /// Fill the memory with the result of the closure.
+    ///
+    /// # Examples
+    /// Correct usage of this function:
+    /// ```
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// let res: &mut [(u8, u16)] = unsafe {
+    ///    alloc.grow_with(10, || {
+    ///       (2, 2)
+    ///   })?
+    /// };
+    /// assert_eq!(res, [(2, 2); 10]);
+    /// # Ok::<_, Error>(())
+    /// ```
     fn grow_with(
         &mut self,
         addition: usize,
         f: impl FnMut() -> Self::Item,
     ) -> Result<&mut [Self::Item]> {
-        unsafe {
-            self.grow(addition, |_, uninit| {
-                uninit::fill_with(uninit, f);
-            })
-        }
-    }
-
-    fn grow_with(
-        &mut self,
-        addition: usize,
-        f: impl FnMut() -> Self::Item,
-    ) -> Result<&mut [Self::Item]> {
-        fn inner<T>(uninit: &mut [MaybeUninit<T>], mut f: impl FnMut() -> T) {
+        fn inner<T>(uninit: &mut [MaybeUninit<T>], mut fill: impl FnMut() -> T) {
             let mut guard = Guard { slice: uninit, init: 0 };
-            
+
             for el in guard.slice.iter_mut() {
-                el.write(f());
+                el.write(fill());
                 guard.init += 1;
             }
-            
+
             mem::forget(guard);
         }
         unsafe {
@@ -207,76 +207,76 @@ pub trait RawMem<T> {
             })
         }
     }
-
-    unsafe fn grow_zeroed(
-        &mut self,
-        cap: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
-    ) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |uninit| {
-            ptr::write_bytes(uninit.as_mut_ptr() as *mut u8, 0, uninit.len() * size_of::<T>());
-            fill(uninit);
-        })
-    }
-
+    /// Fills initialized memory with a given value.
+    /// # Examples
+    /// Correct usage of this function:
+    /// ```
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// let res: &mut [(u8, u16)] = unsafe {
+    ///   alloc.grow_filled(10, (2, 2))?
+    /// };
+    /// assert_eq!(res, [(2, 2); 10]);
+    /// # Ok::<_, Error>(())
+    /// ```
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
     {
+        trait SpecFill<T> {
+            fn fill(&mut self, val: T);
+        }
+
+        impl<T: Clone> SpecFill<T> for [MaybeUninit<T>] {
+            default fn fill(&mut self, val: T) {
+                let mut guard = Guard { slice: self, init: 0 };
+
+                if let Some((last, elems)) = guard.slice.split_last_mut() {
+                    for el in elems {
+                        el.write(val.clone());
+                        guard.init += 1;
+                    }
+                    last.write(val);
+                    guard.init += 1;
+                }
+
+                mem::forget(guard);
+            }
+        }
+
+        impl<T: Copy> SpecFill<T> for [MaybeUninit<T>] {
+            fn fill(&mut self, val: T) {
+                for item in self {
+                    item.write(val);
+                }
+            }
+        }
+
+        fn uninit_fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
+            SpecFill::fill(uninit, val);
+        }
+
         unsafe {
-            self.grow(cap, |_, uninit| {
-                uninit::fill(uninit, value);
+            self.grow(cap, |uninit| {
+                uninit_fill(uninit, value);
             })
         }
     }
-
+    /// Shrinks the capacity of the memory to fit its length.
+    /// # Examples
+    /// ```
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// let mut res: &mut [(u8, u16)] = unsafe {
+    ///  alloc.grow(10, || {
+    ///    (2, 2)
+    /// })?
+    /// };
+    /// res.shrink(5)?;
+    /// assert_eq!(res, [(2, 2); 5]);
+    /// # Ok::<_, Error>(())
+    /// ```
     fn shrink(&mut self, cap: usize) -> Result<()>;
-}
-
-pub mod uninit {
-    use std::{mem, mem::MaybeUninit, ptr};
-
-    pub fn fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
-        let mut guard = Guard { slice: uninit, init: 0 };
-
-        if let Some((last, elems)) = guard.slice.split_last_mut() {
-            for el in elems.iter_mut() {
-                el.write(val.clone());
-                guard.init += 1;
-            }
-            last.write(val);
-            guard.init += 1;
-        }
-
-        mem::forget(guard);
-    }
-
-    pub fn fill_with<T>(uninit: &mut [MaybeUninit<T>], mut fill: impl FnMut() -> T) {
-        let mut guard = Guard { slice: uninit, init: 0 };
-
-        for el in guard.slice.iter_mut() {
-            el.write(fill());
-            guard.init += 1;
-        }
-
-        mem::forget(guard);
-    }
-
-    struct Guard<'a, T> {
-        slice: &'a mut [MaybeUninit<T>],
-        init: usize,
-    }
-
-    impl<T> Drop for Guard<'_, T> {
-        fn drop(&mut self) {
-            debug_assert!(self.init <= self.slice.len());
-            // SAFETY: this raw slice will contain only initialized objects
-            // that's why, it is allowed to drop it.
-            unsafe {
-                ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
-                    self.slice.get_unchecked_mut(..self.init),
-                ));
-            }
-        }
-    }
 }
