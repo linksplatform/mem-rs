@@ -4,22 +4,6 @@ use std::{alloc::Layout, mem::MaybeUninit};
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
-
-struct Guard<'a, T> {
-    slice: &'a mut [MaybeUninit<T>],
-    init: usize,
-}
-
-impl<'a, T> Drop for Guard<'a, T> {
-    fn drop(&mut self) {
-        // SAFETY: this raw slice will contain only initialized objects
-        // that's why, it is allowed to drop it.
-        unsafe {
-            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(&mut self.slice[..self.init]));
-        }
-    }
-}
-
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `isize::MAX` bytes).
@@ -61,7 +45,7 @@ pub enum Error {
 /// Alias for `Result<T, Error>` to return from `RawMem` methods
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait RawMem<T> {
+pub trait RawMem {
     type Item;
 
     fn allocated(&self) -> &[Self::Item];
@@ -81,7 +65,7 @@ pub trait RawMem<T> {
     ///
     /// let mut alloc = Alloc::new(Global);
     /// unsafe {
-    ///     alloc.grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
+    ///     alloc.grow(10, |_init, _uninit: &mut [MaybeUninit<u64>]| {
     ///         // `RawMem` relies on the fact that we initialize memory
     ///         // even if they are primitives
     ///     })?;
@@ -184,39 +168,6 @@ pub trait RawMem<T> {
                 uninit::fill_with(uninit, f);
             })
         }
-    }
-
-    fn grow_with(
-        &mut self,
-        addition: usize,
-        f: impl FnMut() -> Self::Item,
-    ) -> Result<&mut [Self::Item]> {
-        fn inner<T>(uninit: &mut [MaybeUninit<T>], mut f: impl FnMut() -> T) {
-            let mut guard = Guard { slice: uninit, init: 0 };
-            
-            for el in guard.slice.iter_mut() {
-                el.write(f());
-                guard.init += 1;
-            }
-            
-            mem::forget(guard);
-        }
-        unsafe {
-            self.grow(addition, |uninit| {
-                inner(uninit, f);
-            })
-        }
-    }
-
-    unsafe fn grow_zeroed(
-        &mut self,
-        cap: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
-    ) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |uninit| {
-            ptr::write_bytes(uninit.as_mut_ptr() as *mut u8, 0, uninit.len() * size_of::<T>());
-            fill(uninit);
-        })
     }
 
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
