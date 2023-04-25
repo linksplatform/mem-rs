@@ -65,7 +65,7 @@ pub trait RawMem {
     ///
     /// let mut alloc = Alloc::new(Global);
     /// unsafe {
-    ///     alloc.grow(10, |_init, _uninit: &mut [MaybeUninit<u64>]| {
+    ///     alloc.grow(10, |_inited, _uninit: &mut [MaybeUninit<u64>]| {
     ///         // `RawMem` relies on the fact that we initialize memory
     ///         // even if they are primitives
     ///     })?;
@@ -105,8 +105,8 @@ pub trait RawMem {
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
         self.grow(cap, |inited, uninit| {
+            // fixme: maybe change it to `assert_eq!`
             debug_assert_eq!(
-                // fixme: maybe change it to `assert_eq!`
                 inited,
                 uninit.len(),
                 "grown memory must be initialized, \
@@ -145,7 +145,7 @@ pub trait RawMem {
     /// use platform_mem::{Global, RawMem};
     ///
     /// let mut alloc = Global::new();
-    /// let zeroes: &mut [&'static str] = unsafe {
+    /// let _: &mut [&'static str] = unsafe {
     ///     alloc.grow_zeroed(10)? // Undefined behavior!
     /// };
     ///

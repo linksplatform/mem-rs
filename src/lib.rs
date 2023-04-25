@@ -4,7 +4,8 @@
     maybe_uninit_slice,
     slice_ptr_get,
     ptr_as_uninit,
-    inline_const
+    inline_const,
+    min_specialization
 )]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
@@ -89,12 +90,12 @@ use std::{
 
 delegate_memory! {
     Global<T>(Alloc<T, GlobalAlloc>) {
-        pub fn new() -> Self {
+        pub const fn new() -> Self {
             Self(Alloc::new(GlobalAlloc))
         }
     }
    System<T>(Alloc<T, SystemAlloc>) {
-       pub fn new() -> Self {
+       pub const fn new() -> Self {
            Self(Alloc::new(SystemAlloc))
        }
    }
@@ -130,15 +131,17 @@ impl<T> Default for System<T> {
 fn miri() {
     pub fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
     where
-        M::Item: Clone,
+        M::Item: Clone + PartialEq,
     {
-        for _ in 0..10 {
-            mem.grow_filled(10, val.clone())?;
-        }
-        assert_eq!(mem.allocated().len(), 100);
+        const GROW: usize = if cfg!(miri) { 100 } else { 10_000 };
 
         for _ in 0..10 {
-            mem.shrink(10)?;
+            mem.grow_filled(GROW, val.clone())?;
+        }
+        assert!(mem.allocated() == vec![val; GROW * 10]);
+
+        for _ in 0..10 {
+            mem.shrink(GROW)?;
         }
         assert_eq!(mem.allocated().len(), 0);
 
