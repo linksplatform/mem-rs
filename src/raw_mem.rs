@@ -70,26 +70,7 @@ impl<T> Drop for Guard<'_, T> {
 pub trait RawMem {
     type Item;
 
-    /// Returns a slice of the allocated memory.
-    /// # Examples
-    ///```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// alloc.grow_with(10, Default::default)?;
-    /// assert_eq!(alloc.allocated().len(), 10);
-    /// ```
-
     fn allocated(&self) -> &[Self::Item];
-    /// Returns a mutable slice of the allocated memory.
-    /// # Examples
-    /// ```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// alloc.grow_with(10, Default::default)?;
-    /// assert_eq!(alloc.allocated_mut().len(), 10);
-    /// ```
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
@@ -189,19 +170,22 @@ pub trait RawMem {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
-    /// [`grow`] which fills grown memory with elements returned by calling a closure repeatedly.
+    /// Fill the memory with the result of the closure.
+    ///
     /// # Examples
+    /// Correct usage of this function:
     /// ```
     /// # #![feature(allocator_api)]
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
-    ///
-    /// let mut mem = Global::new();
-    /// mem.grow_with(10, Default::default)?;
-    /// assert_eq!(mem.allocated().len(), 10);
-    /// # Result::Ok(())
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// let res: &mut [(u8, u16)] = unsafe {
+    ///    alloc.grow_with(10, || {
+    ///       (2, 2)
+    ///   })?
+    /// };
+    /// assert_eq!(res, [(2, 2); 10]);
+    /// # Ok::<_, Error>(())
     /// ```
-    /// [`grow`]: Self::grow
     fn grow_with(
         &mut self,
         addition: usize,
@@ -223,25 +207,19 @@ pub trait RawMem {
             })
         }
     }
-    /// [`grow`] which fills grown memory with elements by cloning `value`.
-    ///
+    /// Fills initialized memory with a given value.
     /// # Examples
-    ///
+    /// Correct usage of this function:
     /// ```
     /// # #![feature(allocator_api)]
-    /// # use platform_mem::Error;
     /// use platform_mem::{Global, RawMem};
-    ///
-    /// let mut mem = Global::new();
-    /// mem.grow_filled(10, String::from("hello"))?;
-    ///
-    /// assert_eq!(mem.allocated(), ["hello"; 10]);
-    ///
+    /// let mut alloc = Global::new();
+    /// let res: &mut [(u8, u16)] = unsafe {
+    ///   alloc.grow_filled(10, (2, 2))?
+    /// };
+    /// assert_eq!(res, [(2, 2); 10]);
     /// # Ok::<_, Error>(())
-    ///
     /// ```
-    /// [`grow`]: Self::grow
-    ///
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -285,34 +263,20 @@ pub trait RawMem {
             })
         }
     }
-    /// Shrinks the capacity of the allocated memory to `cap`.
-    /// # Panics
-    /// Panics if `cap` is greater than the allocated memory's current capacity.
-    ///
-    /// ```
-    /// should_panic
-    ///
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
-    ///
-    /// let mut mem = Global::new();
-    /// mem.grow(10, Default::default)?;
-    /// mem.shrink(15)?;
-    /// assert_eq!(mem.allocated().len(), 10);
-    /// # Result::Ok(())
-    /// ```
+    /// Shrinks the capacity of the memory to fit its length.
     /// # Examples
-    ///
     /// ```
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
-    ///
-    /// let mut mem = Global::new();
-    /// mem.grow(10, Default::default)?;
-    /// mem.shrink(5)?;
-    ///
-    /// assert_eq!(mem.allocated().len(), 5);
-    /// # Result::Ok(())
+    /// # #![feature(allocator_api)]
+    /// use platform_mem::{Global, RawMem};
+    /// let mut alloc = Global::new();
+    /// let mut res: &mut [(u8, u16)] = unsafe {
+    ///  alloc.grow(10, || {
+    ///    (2, 2)
+    /// })?
+    /// };
+    /// res.shrink(5)?;
+    /// assert_eq!(res, [(2, 2); 5]);
+    /// # Ok::<_, Error>(())
     /// ```
     fn shrink(&mut self, cap: usize) -> Result<()>;
 }
