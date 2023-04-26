@@ -1,7 +1,7 @@
 use {
     crate::{
         utils,
-        Error::{AllocError, CapacityOverflow},
+        Error::{self, CapacityOverflow},
         RawMem, RawPlace, Result,
     },
     std::{
@@ -47,7 +47,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         } else {
             self.alloc.allocate(new_layout)
         }
-        .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+        .map_err(|_| Error::Alloc { layout: new_layout, non_exhaustive: () })?
         .cast();
 
         Ok(self.buf.handle_fill(ptr, cap, fill))
@@ -68,7 +68,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
             let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
             self.alloc
                 .shrink(ptr, layout, new_layout)
-                .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+                .map_err(|_| Error::Alloc { layout: new_layout, non_exhaustive: () })?
         };
 
         #[allow(clippy::unit_arg)] // it is allows shortest return `Ok(())`
