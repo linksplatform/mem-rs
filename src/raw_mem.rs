@@ -33,7 +33,7 @@ pub enum Error {
 
     /// The memory allocator returned an error
     #[error("memory allocation of {layout:?} failed")]
-    Alloc {
+    AllocError {
         /// The layout of allocation request that failed
         layout: Layout,
 
