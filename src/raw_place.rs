@@ -15,6 +15,12 @@ pub struct RawPlace<T> {
 }
 
 impl<T> RawPlace<T> {
+    /// Creates a new `RawPlace` with the given pointer and capacity.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// ```
     pub const fn dangling() -> Self {
         // fixme: ZST correctness isn't checked now
         const { assert!(mem::size_of::<T>() != 0) };
@@ -25,7 +31,13 @@ impl<T> RawPlace<T> {
 
         Self { ptr: NonNull::dangling(), len: 0, cap: 0, _marker: PhantomData }
     }
-
+    /// Return a capacity of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// assert_eq!(place.cap(), 0);
+    /// ```
     pub fn cap(&self) -> usize {
         self.cap
     }
@@ -37,8 +49,14 @@ impl<T> RawPlace<T> {
     pub unsafe fn as_slice_mut(&mut self) -> &mut [T] {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
     }
-
     // we change `ptr`/`cap` only in provided functions, so it's safe
+    /// Return a pointer and layout of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// assert_eq!(place.current_memory(), None);
+    /// ```
     pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         if self.cap == 0 {
             None
@@ -73,7 +91,6 @@ impl<T> RawPlace<T> {
 
         MaybeUninit::slice_assume_init_mut(uninit)
     }
-
     pub fn shrink_to(&mut self, cap: usize) {
         assert!(cap <= self.cap);
 
@@ -84,7 +101,13 @@ impl<T> RawPlace<T> {
         self.cap = cap;
         self.len = cap;
     }
-
+    /// Set a pointer of the `RawPlace`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{RawPlace};
+    /// let mut place = RawPlace::new(NonNull::dangling(), 0);
+    /// place.set_ptr(NonNull::dangling());
+    /// ```
     pub fn set_ptr(&mut self, ptr: NonNull<[u8]>) {
         debug_assert_eq!(
             ptr.len(),

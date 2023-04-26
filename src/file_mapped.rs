@@ -19,6 +19,12 @@ pub struct FileMapped<T> {
 }
 
 impl<T> FileMapped<T> {
+    /// Creates a new `FileMapped` with the given file.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// ```
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 
@@ -28,7 +34,12 @@ impl<T> FileMapped<T> {
 
         Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
     }
-
+    /// Creates a new `FileMapped` with the given file path.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::from_path("test.txt");
+    /// ```
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         File::options().create(true).read(true).write(true).open(path).and_then(Self::new)
     }
@@ -44,11 +55,23 @@ impl<T> FileMapped<T> {
 
 impl<T> RawMem for FileMapped<T> {
     type Item = T;
-
+    /// Returns a slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// let slice = file_mapped.allocated();
+    /// ```
     fn allocated(&self) -> &[Self::Item] {
         unsafe { self.buf.as_slice() }
     }
-
+    /// Returns a mutable slice of the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// let slice = file_mapped.allocated_mut();
+    /// ```
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
         unsafe { self.buf.as_slice_mut() }
     }
@@ -79,7 +102,13 @@ impl<T> RawMem for FileMapped<T> {
 
         Ok(self.buf.handle_fill(ptr.cast(), cap, fill))
     }
-
+    /// Shrinks the capacity of the allocated memory to `cap`.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// file_mapped.shrink(1);
+    /// ```
     fn shrink(&mut self, cap: usize) -> Result<()> {
         let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
         self.buf.shrink_to(cap);
@@ -105,6 +134,13 @@ impl<T> RawMem for FileMapped<T> {
 }
 
 impl<T> Drop for FileMapped<T> {
+    /// Drops the allocated memory.
+    /// # Examples
+    /// ```
+    /// use platform_mem::{FileMapped};
+    /// let mut file_mapped = FileMapped::new();
+    /// drop(file_mapped);
+    /// ```
     fn drop(&mut self) {
         unsafe {
             ptr::drop_in_place(self.buf.as_slice_mut());
