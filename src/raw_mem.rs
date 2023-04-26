@@ -1,4 +1,9 @@
-use std::{alloc::Layout, mem::MaybeUninit};
+use std::{
+    alloc::Layout,
+    mem::MaybeUninit,
+    ops::{Range, RangeBounds},
+    slice,
+};
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
@@ -65,7 +70,7 @@ pub trait RawMem {
     ///
     /// let mut alloc = Alloc::new(Global);
     /// unsafe {
-    ///     alloc.grow(10, |_init, _uninit: &mut [MaybeUninit<u64>]| {
+    ///     alloc.grow(10, |_init, (_, _uninit): (_, &mut [MaybeUninit<u64>])| {
     ///         // `RawMem` relies on the fact that we initialize memory
     ///         // even if they are primitives
     ///     })?;
@@ -75,7 +80,7 @@ pub trait RawMem {
     unsafe fn grow(
         &mut self,
         cap: usize,
-        fill: impl FnOnce(usize, &mut [MaybeUninit<Self::Item>]),
+        fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
     ) -> Result<&mut [Self::Item]>;
 
     /// [`grow`] which assumes that the memory is already initialized
@@ -104,9 +109,9 @@ pub trait RawMem {
     /// [`grow`]: Self::grow
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |inited, uninit| {
+        self.grow(cap, |inited, (_, uninit)| {
+            // fixme: maybe change it to `assert_eq!`
             debug_assert_eq!(
-                // fixme: maybe change it to `assert_eq!`
                 inited,
                 uninit.len(),
                 "grown memory must be initialized, \
@@ -153,7 +158,7 @@ pub trait RawMem {
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |_, uninit| {
+        self.grow(cap, |_, (_, uninit)| {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
@@ -164,7 +169,7 @@ pub trait RawMem {
         f: impl FnMut() -> Self::Item,
     ) -> Result<&mut [Self::Item]> {
         unsafe {
-            self.grow(addition, |_, uninit| {
+            self.grow(addition, |_, (_, uninit)| {
                 uninit::fill_with(uninit, f);
             })
         }
@@ -175,8 +180,20 @@ pub trait RawMem {
         Self::Item: Clone,
     {
         unsafe {
-            self.grow(cap, |_, uninit| {
+            self.grow(cap, |_, (_, uninit)| {
                 uninit::fill(uninit, value);
+            })
+        }
+    }
+
+    fn grow_within<R: RangeBounds<usize>>(&mut self, range: R) -> Result<&mut [Self::Item]>
+    where
+        Self::Item: Clone,
+    {
+        let Range { start, end } = slice::range(range, ..self.allocated().len());
+        unsafe {
+            self.grow(end - start, |_, (within, uninit)| {
+                MaybeUninit::write_slice_cloned(uninit, &within[start..end]);
             })
         }
     }

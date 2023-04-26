@@ -57,7 +57,7 @@ impl<T> RawPlace<T> {
         &mut self,
         (ptr, cap): (NonNull<T>, usize),
         inited: usize,
-        fill: impl FnOnce(usize, &mut [MaybeUninit<T>]),
+        fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
     ) -> &mut [T] {
         let uninit = NonNull::slice_from_raw_parts(ptr, cap)
             .get_unchecked_mut(self.cap..)
@@ -67,7 +67,9 @@ impl<T> RawPlace<T> {
         self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
         //                 ( alloc memory )
 
-        fill(inited, uninit); // panic out!
+        // slice from `as_slice_mut` will be the initialized part of owned memory
+        // while (&mut [T], &mut [MaybeUninit<T>]) will be the full memory
+        fill(inited, (self.as_slice_mut(), uninit)); // panic out!
 
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 

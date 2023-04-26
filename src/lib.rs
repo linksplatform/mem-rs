@@ -4,7 +4,9 @@
     maybe_uninit_slice,
     slice_ptr_get,
     ptr_as_uninit,
-    inline_const
+    inline_const,
+    slice_range,
+    maybe_uninit_write_slice
 )]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
@@ -60,7 +62,7 @@ macro_rules! delegate_memory {
                 unsafe fn grow(
                     &mut self,
                     addition: usize,
-                    fill: impl FnOnce(usize, &mut [MaybeUninit<Self::Item>]),
+                    fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
                 ) -> Result<&mut [Self::Item]> {
                     self.0.grow(addition, fill)
                 }
@@ -177,7 +179,7 @@ fn yet() -> Result<()> {
 
         assert_eq!(b"hello world", mem.grow_assumed(5 + 1 + 5)?); // is size of `hello world`
 
-        mem.grow(10_000, |inited, uninit| {
+        mem.grow(10_000, |inited, (_, uninit)| {
             assert_eq!(inited, TAIL_SIZE);
             assert_eq!(10_000, uninit.len());
         })?;

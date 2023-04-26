@@ -56,8 +56,8 @@ impl<T> RawMem for FileMapped<T> {
     unsafe fn grow(
         &mut self,
         addition: usize,
-        fill: impl FnOnce(usize, &mut [MaybeUninit<Self::Item>]),
-    ) -> Result<&mut [Self::Item]> {
+        fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
+    ) -> Result<&mut [T]> {
         let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
         // use layout to prevent all capacity bugs
         let layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
