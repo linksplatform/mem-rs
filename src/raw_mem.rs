@@ -6,7 +6,9 @@ use std::{
 
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 /// The `Error` error indicates [*growing*]/[*shrinking*] failure of the [`RawMem`]
-/// that may be due by implementation details. E.g allocation failure or I/O error
+/// that may be due by implementation details.
+///
+/// E.g allocation failure or I/O error
 ///
 /// [*growing*]: RawMem::grow
 /// [*shrinking*]: RawMem::shrink
