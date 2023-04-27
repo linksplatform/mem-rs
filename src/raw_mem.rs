@@ -67,6 +67,44 @@ impl<T> Drop for Guard<'_, T> {
     }
 }
 
+/// Defines a low-level API for working with memory allocations. It provides methods for growing, shrinking, and initializing memory in various ways.
+/// # Features
+///
+/// * The [`allocated`][allocated] and [`allocated_mut`][allocated_mut] methods provide access to the allocated memory.
+/// * The [`grow`][grow] method allows you to increase the capacity of memory and initialize it using a provided closure.
+/// * The [`grow_assumed`][grow_assumed] method is a version of grow that assumes the memory is already initialized.
+/// * The [`grow_zeroed`][grow_zeroed] method increases the capacity of memory and initializes it with zeroes.
+/// * The [`grow_with`][grow_with] method increases the capacity of memory and initializes it with the result of a given closure.
+/// * The [`grow_filled`][grow_filled] method increases the capacity of memory and initializes it with a given value.
+/// * The [`shrink`][shrink] method decreases the capacity of memory to fit its length.
+///
+/// [allocated]: Self::allocated
+/// [allocated_mut]: Self::allocated_mut
+/// [grow]: Self::grow
+/// [grow_assumed]: Self::grow_assumed
+/// [grow_zeroed]: Self::grow_zeroed
+/// [grow_with]: Self::grow_with
+/// [grow_filled]: Self::grow_filled
+/// [shrink]: Self::shrink
+///
+/// # Examples
+/// ```
+/// # #![feature(allocator_api)]
+/// # use std::alloc::Global;
+/// # use std::mem::MaybeUninit;
+/// # use platform_mem::Result;
+/// use platform_mem::{Alloc, RawMem};
+///
+/// let mut alloc = Alloc::new(Global);
+/// unsafe {
+/// alloc.grow(10, |uninit| {
+///     for item in uninit {
+///         item.write(1);
+///     }
+///  })?;
+/// }
+/// # Result::Ok(())
+/// ```
 pub trait RawMem {
     type Item;
 
