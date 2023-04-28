@@ -143,30 +143,25 @@ pub trait RawMem {
     /// Correct usage of this function: initializing an integral-like types with zeroes:
     /// ```
     /// # #![feature(allocator_api)]
-    /// # use platform_mem::Error;
-    /// use platform_mem::{Global, RawMem};
-    ///
+    /// # use platform_mem::{Result, Global, RawMem};
     /// let mut alloc = Global::new();
     /// let zeroes: &mut [(u8, u16)] = unsafe {
     ///     alloc.grow_zeroed(10)?
     /// };
     ///
     /// assert_eq!(zeroes, [(0, 0); 10]);
-    /// # Ok::<_, Error>(())
+    /// # Result::Ok(())
     /// ```
     ///
     /// Incorrect usage of this function: initializing a reference with zero:
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    ///  # use platform_mem::Error;
-    /// use platform_mem::{Global, RawMem};
-    ///
+    /// # use platform_mem::{Result, Global, RawMem};
     /// let mut alloc = Global::new();
     /// let zeroes: &mut [&'static str] = unsafe {
     ///     alloc.grow_zeroed(10)? // Undefined behavior!
     /// };
     ///
-    /// # Ok::<_, Error>(())
+    /// # Result::Ok(())
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
