@@ -142,7 +142,6 @@ pub trait RawMem {
     /// # Examples
     /// Correct usage of this function: initializing an integral-like types with zeroes:
     /// ```
-    /// # #![feature(allocator_api)]
     /// # use platform_mem::{Result, Global, RawMem};
     /// let mut alloc = Global::new();
     /// let zeroes: &mut [(u8, u16)] = unsafe {
