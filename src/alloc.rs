@@ -23,7 +23,7 @@ impl<T, A: Allocator> Alloc<T, A> {
     /// ```
     /// # use platform_mem::Global;
     /// // It's able to be static
-    /// static ALLOC: Global<String> = Global::new();
+    /// static ALLOC: Global<()> = Global::new();
     /// ```
     pub const fn new(alloc: A) -> Self {
         Self { buf: RawPlace::dangling(), alloc }
