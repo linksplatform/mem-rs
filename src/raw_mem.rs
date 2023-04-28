@@ -1,6 +1,7 @@
 use std::{
     alloc::Layout,
     mem::{self, MaybeUninit},
+    ops::{Deref, DerefMut},
     ptr,
 };
 
@@ -67,11 +68,8 @@ impl<T> Drop for Guard<'_, T> {
     }
 }
 
-pub trait RawMem {
+pub trait RawMem: Deref<Target = [Self::Item]> + DerefMut {
     type Item;
-
-    fn allocated(&self) -> &[Self::Item];
-    fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
     /// Caller must guarantee that `fill` makes the uninitialized part valid for
