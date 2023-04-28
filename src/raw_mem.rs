@@ -28,8 +28,8 @@ pub enum Error {
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
 
-    #[error("cannot allocate {to_alloc} - available only {available}")]
-    OverAlloc { available: usize, to_alloc: usize },
+    #[error("can't grow {to_grow}, only available {available}")]
+    OverGrow { to_grow: usize, available: usize },
 
     /// The memory allocator returned an error
     #[error("memory allocation of {layout:?} failed")]
