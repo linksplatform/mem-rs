@@ -1,15 +1,12 @@
 use {
-    crate::{Error::CapacityOverflow, RawMem, RawPlace, Result},
+    crate::{Error::CapacityOverflow, RawMem, Result},
     std::{
-        alloc::{Allocator, Global, Layout},
-        fmt::{self, Debug, Formatter},
         io::Error,
         mem::{self, MaybeUninit},
         ops::{Deref, DerefMut},
-        ptr,
     },
 };
-
+#[derive(Debug)]
 pub struct PreAlloc<P> {
     place: P,
     used: usize,
