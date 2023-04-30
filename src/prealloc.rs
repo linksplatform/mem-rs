@@ -51,11 +51,7 @@ impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()> {
-        if cap <= self.used {
-            self.used = self.used.checked_sub(cap).expect("Tried to shrink to a larger capacity");
-            Ok(())
-        } else {
-            Ok(())
-        }
+        self.used = self.used.checked_sub(cap).expect("Tried to shrink to a larger capacity");
+        Ok(())
     }
 }
