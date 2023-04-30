@@ -3,6 +3,7 @@ use {
     std::{
         alloc::{Allocator, Global, Layout},
         fmt::{self, Debug, Formatter},
+        io::Error,
         mem::{self, MaybeUninit},
         ops::{Deref, DerefMut},
         ptr,
@@ -45,11 +46,17 @@ impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
             self.used = cap;
             Ok(slice)
         } else {
-            Err(Error::OverAlloc { available, to_alloc: cap })
+            Ok(&mut [])
+            //Err(Error::OverAlloc { available, to_alloc: cap })
         }
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()> {
-        todo!()
+        if cap <= self.used {
+            self.used = self.used.checked_sub(cap).expect("Tried to shrink to a larger capacity");
+            Ok(())
+        } else {
+            Ok(())
+        }
     }
 }
