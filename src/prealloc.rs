@@ -1,50 +1,91 @@
-use crate::{Error, RawMem, Result};
-use std::marker::PhantomData;
-use tap::TapOptional;
+use {
+    crate::{RawMem, RawPlace, Result},
+    std::{
+        alloc::{Allocator, Global, Layout},
+        fmt::{self, Debug, Formatter},
+        mem::{self, MaybeUninit},
+        ptr,
+    },
+};
 
+use crate::Error::CapacityOverflow;
 /// [`RawMem`] that own any type that provides refs to memory block
 /// (<code>[`AsMut<[T]>`] + [`AsRef<[T]>`]</code>)
-pub struct PreAlloc<T, D> {
-    data: D,
-    allocated: usize,
-    // unlike other implementations dropck escape-hatch store in `D`
-    // but `T` is unused :)
-    marker: PhantomData<T>,
+use std::ops::{Deref, DerefMut};
+
+pub struct PreAlloc<P> {
+    place: P,
+    used: usize,
 }
 
-impl<T, D> PreAlloc<T, D> {
+impl<T, P: Deref<Target = [T]> + DerefMut> PreAlloc<P> {
     /// Constructs new `PreAlloc`
-    pub const fn new(data: D) -> Self {
-        Self {
-            data,
-            allocated: 0,
-            marker: PhantomData,
+    pub const fn new(place: P) -> Self {
+        Self { place, used: 0 }
+    }
+}
+
+impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
+    type Item = T;
+
+    fn allocated(&self) -> &[Self::Item] {
+        &self.place[..self.used]
+    }
+
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+        &mut self.place[..self.used]
+    }
+
+    unsafe fn grow(
+        &mut self,
+        addition: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        let cap = self.used.checked_add(addition).ok_or(CapacityOverflow)?;
+        let available = self.place.len();
+
+        if let Some(slice) = self.place.get_mut(self.used..cap) {
+            fill(mem::transmute(&mut slice[..]));
+            self.used = cap;
+            Ok(slice)
+        } else {
+            Err(Error::OverAlloc { available, to_alloc: cap })
         }
     }
+
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        todo!()
+    }
 }
+impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
+    type Item = T;
 
-impl<T, D: AsMut<[T]> + AsRef<[T]>> RawMem<T> for PreAlloc<T, D> {
-    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-        let slice = self.data.as_mut();
-        let available = slice.len();
-        slice
-            .get_mut(0..capacity)
-            // equivalent `Some::inspect` but stable and has more logic name than `inspect`
-            .tap_some(|_| {
-                // set `allocated` if data is valid
-                self.allocated = capacity;
-            })
-            .ok_or(Error::OverAlloc {
-                available,
-                to_alloc: capacity,
-            })
+    fn allocated(&self) -> &[Self::Item] {
+        &self.place[..self.used]
     }
 
-    fn allocated(&self) -> usize {
-        self.allocated
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+        &mut self.place[..self.used]
     }
 
-    fn size_hint(&self) -> usize {
-        self.data.as_ref().len()
+    unsafe fn grow(
+        &mut self,
+        addition: usize,
+        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+    ) -> Result<&mut [Self::Item]> {
+        let cap = self.used.checked_add(addition).ok_or(CapacityOverflow)?;
+        let available = self.place.len();
+
+        if let Some(slice) = self.place.get_mut(self.used..cap) {
+            fill(mem::transmute(&mut slice[..]));
+            self.used = cap;
+            Ok(slice)
+        } else {
+            Err(Error::OverAlloc { available, to_alloc: cap })
+        }
+    }
+
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        todo!()
     }
 }
