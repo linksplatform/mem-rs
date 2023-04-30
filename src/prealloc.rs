@@ -17,7 +17,7 @@ pub struct PreAlloc<P> {
 
 impl<T, P: Deref<Target = [T]> + DerefMut> PreAlloc<P> {
     /// Constructs new `PreAlloc`
-    pub const fn new(place: P) -> Self {
+    pub fn new(place: P) -> Self {
         Self { place, used: 0 }
     }
 }
@@ -46,8 +46,7 @@ impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
             self.used = cap;
             Ok(slice)
         } else {
-            Ok(&mut [])
-            //Err(Error::OverAlloc { available, to_alloc: cap })
+            Err(Error::OverAlloc { available, to_alloc: cap })
         }
     }
 
