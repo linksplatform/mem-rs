@@ -70,6 +70,10 @@ macro_rules! delegate_memory {
                 fn shrink(&mut self, cap: usize) -> Result<()> {
                     self.0.shrink(cap)
                 }
+
+                fn size_hint(&self) -> Option<usize> {
+                    self.0.size_hint()
+                }
             }
 
             impl<T> fmt::Debug for $me<$param> {

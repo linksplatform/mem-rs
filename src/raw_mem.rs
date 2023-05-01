@@ -85,7 +85,9 @@ pub trait RawMem {
 
     fn shrink(&mut self, cap: usize) -> Result<()>;
 
-    fn size_hint(&self) -> Option<usize>;
+    fn size_hint(&self) -> Option<usize> {
+        None
+    }
 
     /// [`grow`] which assumes that the memory is already initialized
     ///
@@ -167,6 +169,12 @@ pub trait RawMem {
         })
     }
 
+    unsafe fn grow_zeroed_exact(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
+        self.grow(cap, |inited, (_, uninit)| {
+            uninit.get_unchecked_mut(inited..).as_mut_ptr().write_bytes(0u8, uninit.len());
+        })
+    }
+
     fn grow_with(
         &mut self,
         addition: usize,
@@ -179,6 +187,18 @@ pub trait RawMem {
         }
     }
 
+    unsafe fn grow_with_exact(
+        &mut self,
+        addition: usize,
+        f: impl FnMut() -> Self::Item,
+    ) -> Result<&mut [Self::Item]> {
+        unsafe {
+            self.grow(addition, |inited, (_, uninit)| {
+                uninit::fill_with(&mut uninit[inited..], f);
+            })
+        }
+    }
+
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -186,6 +206,21 @@ pub trait RawMem {
         unsafe {
             self.grow(cap, |_, (_, uninit)| {
                 uninit::fill(uninit, value);
+            })
+        }
+    }
+
+    unsafe fn grow_filled_exact(
+        &mut self,
+        cap: usize,
+        value: Self::Item,
+    ) -> Result<&mut [Self::Item]>
+    where
+        Self::Item: Clone,
+    {
+        unsafe {
+            self.grow(cap, |inited, (_, uninit)| {
+                uninit::fill(&mut uninit[inited..], value);
             })
         }
     }
