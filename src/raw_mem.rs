@@ -29,8 +29,8 @@ pub enum Error {
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
 
-    #[error("cannot allocate {to_alloc} - available only {available}")]
-    OverAlloc { available: usize, to_alloc: usize },
+    #[error("can't grow {to_grow} elements, only available {available}")]
+    OverGrow { to_grow: usize, available: usize },
 
     /// The memory allocator returned an error
     #[error("memory allocation of {layout:?} failed")]
@@ -82,6 +82,10 @@ pub trait RawMem {
         cap: usize,
         fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
     ) -> Result<&mut [Self::Item]>;
+
+    fn shrink(&mut self, cap: usize) -> Result<()>;
+
+    fn size_hint(&self) -> Option<usize>;
 
     /// [`grow`] which assumes that the memory is already initialized
     ///
@@ -197,8 +201,6 @@ pub trait RawMem {
             })
         }
     }
-
-    fn shrink(&mut self, cap: usize) -> Result<()>;
 }
 
 pub mod uninit {
