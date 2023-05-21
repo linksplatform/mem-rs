@@ -45,18 +45,25 @@ macro_rules! delegate_memory {
             use std::{
                 mem::MaybeUninit,
                 fmt::{self, Formatter},
+                ops::{Deref, DerefMut},
             };
+
+            impl<$param> Deref for $me<$param> {
+                type Target = [$param];
+
+                fn deref(&self) -> &Self::Target {
+                    &*self.0
+                }
+            }
+
+            impl<$param> DerefMut for$me<$param> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut *self.0
+                }
+            }
 
             impl<$param> RawMem for $me<$param> {
                 type Item = $param;
-
-                fn allocated(&self) -> &[Self::Item] {
-                    self.0.allocated()
-                }
-
-                fn allocated_mut(&mut self) -> &mut [Self::Item] {
-                    self.0.allocated_mut()
-                }
 
                 unsafe fn grow(
                     &mut self,
@@ -138,12 +145,12 @@ fn miri() {
         for _ in 0..10 {
             mem.grow_filled(GROW, val.clone())?;
         }
-        assert!(mem.allocated() == vec![val; GROW * 10]);
+        assert!(mem[..] == vec![val; GROW * 10]);
 
         for _ in 0..10 {
             mem.shrink(GROW)?;
         }
-        assert_eq!(mem.allocated().len(), 0);
+        assert_eq!(mem.len(), 0);
 
         Ok(())
     }

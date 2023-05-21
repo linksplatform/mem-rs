@@ -7,6 +7,7 @@ use {
         fs::File,
         io,
         mem::{self, MaybeUninit},
+        ops::{Deref, DerefMut},
         path::Path,
         ptr::{self, NonNull},
     },
@@ -42,16 +43,22 @@ impl<T> FileMapped<T> {
     }
 }
 
-impl<T> RawMem for FileMapped<T> {
-    type Item = T;
+impl<T> Deref for FileMapped<T> {
+    type Target = [T];
 
-    fn allocated(&self) -> &[Self::Item] {
+    fn deref(&self) -> &Self::Target {
         unsafe { self.buf.as_slice() }
     }
+}
 
-    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+impl<T> DerefMut for FileMapped<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.buf.as_slice_mut() }
     }
+}
+
+impl<T> RawMem for FileMapped<T> {
+    type Item = T;
 
     unsafe fn grow(
         &mut self,
