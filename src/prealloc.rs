@@ -1,7 +1,6 @@
 use {
     crate::{Error::CapacityOverflow, RawMem, Result},
     std::{
-        io::Error,
         mem::{self, MaybeUninit},
         ops::{Deref, DerefMut},
     },
@@ -43,7 +42,7 @@ impl<T, P: Deref<Target = [T]> + DerefMut> RawMem for PreAlloc<P> {
             self.used = cap;
             Ok(slice)
         } else {
-            Err(Error::OverAlloc { available, to_alloc: cap })
+            Err(crate::Error::OverAlloc { available, to_alloc: cap })
         }
     }
 
