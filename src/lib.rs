@@ -176,22 +176,33 @@ macro_rules! define_impls {
     };
 }
 
-fn grow_with(mem: &mut impl RawMem<Item = (u8, u16)>) {
-    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+#[cfg(test)]
+define_impls! {
+    impl RawMem: {
+        Global::new(),
+        System::new(),
+        TempFile::new().unwrap() => in not(miri),
+    } for [
+        grow_with, shrink, allocated,
+    ]
+}
+
+fn grow_with(mut mem: impl RawMem<Item = (u8, u16)>) {
+    let res = mem.grow_with(10, || (2, 2)).expect("grow");
     assert_eq!(res, [(2, 2); 10]);
 }
 
-fn allocated(mem: &mut impl RawMem<Item = (u8, u16)>) {
+fn allocated(mut mem: impl RawMem<Item = (u8, u16)>) {
     assert_eq!(mem.allocated().len(), 0);
 
-    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+    let res = mem.grow_with(10, || (2, 2)).expect("grow");
     assert_eq!(res, [(2, 2); 10]);
 
     assert_eq!(mem.allocated().len(), 10);
 }
 
-fn shrink(mem: &mut impl RawMem<Item = (u8, u16)>) {
-    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+fn shrink(mut mem: impl RawMem<Item = (u8, u16)>) {
+    let res = mem.grow_with(10, || (2, 2)).expect("grow");
     assert_eq!(res, [(2, 2); 10]);
 
     mem.shrink(5).expect("shrink");
