@@ -158,6 +158,24 @@ fn miri() {
     inner(TempFile::new().unwrap(), val).unwrap();
 }
 
+#[cfg(test)]
+macro_rules! define_impls {
+    (impl RawMem: {
+        $($ctor:expr $(=> in $cfg:meta)? ),* $(,)?
+    } for [ $($test:ident),* $(,)? ]
+    ) => {
+        mod generic_tests {$(
+            #[cfg_attr(all(test, $($cfg)?), test)]
+            fn $test() {
+                use super::*;
+                super::$test(
+                    $ctor
+                );
+            }
+        )*}
+    };
+}
+
 fn grow_with(mem: &mut impl RawMem<Item = (u8, u16)>) {
     let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
     assert_eq!(res, [(2, 2); 10]);
