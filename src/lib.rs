@@ -162,7 +162,7 @@ fn miri() {
 macro_rules! define_impls {
     (impl RawMem: {
         $($ctor:expr $(=> in $cfg:meta)? ),* $(,)?
-    } for [ $($path:ident::$test:ident),* $(,)? ]
+    } for [ $($path:ident: { $($test:ident),* $(,)? }),* $(,)? ]
     ) => {
         mod generic_tests {$(
             #[cfg_attr(all(test, $($cfg)?), test)]
@@ -183,7 +183,7 @@ define_impls! {
         System::new(),
         TempFile::new().unwrap() => in not(miri),
     } for [
-        lib::grow_with, lib::shrink, lib::allocated,
+        lib: {grow_with, shrink, allocated},
     ]
 }
 
