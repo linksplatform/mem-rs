@@ -15,6 +15,7 @@
 
 mod alloc;
 mod file_mapped;
+mod prealloc;
 mod raw_mem;
 mod raw_place;
 mod utils;
@@ -155,4 +156,26 @@ fn miri() {
 
     #[cfg(not(miri))]
     inner(TempFile::new().unwrap(), val).unwrap();
+}
+
+fn grow_with(mem: &mut impl RawMem<Item = (u8, u16)>) {
+    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+    assert_eq!(res, [(2, 2); 10]);
+}
+
+fn allocated(mem: &mut impl RawMem<Item = (u8, u16)>) {
+    assert_eq!(mem.allocated().len(), 0);
+
+    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+    assert_eq!(res, [(2, 2); 10]);
+
+    assert_eq!(mem.allocated().len(), 10);
+}
+
+fn shrink(mem: &mut impl RawMem<Item = (u8, u16)>) {
+    let res = unsafe { mem.grow_with(10, || (2, 2)).expect("grow") };
+    assert_eq!(res, [(2, 2); 10]);
+
+    mem.shrink(5).expect("shrink");
+    assert_eq!(mem.allocated(), &[(2, 2); 5]);
 }
