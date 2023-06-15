@@ -204,6 +204,7 @@ define_impls! {
         TempFile::<u32>::new().unwrap() => in not(miri),
     } for [
         grow as grow_test,
+        grow_with as grow_with_test,
     ]
 }
 
@@ -211,5 +212,11 @@ fn grow<T>(mut mem: impl RawMem<Item = T>) {
     unsafe {
         mem.grow(10, |_uninit| {}).expect("error");
     }
+    assert!(mem.allocated().len() == 10);
+}
+
+fn grow_with<T: Copy + From<u8>>(mut mem: impl RawMem<Item = T>) {
+    let value = T::from(2);
+    mem.grow_with(10, || value).expect("grow");
     assert!(mem.allocated().len() == 10);
 }
