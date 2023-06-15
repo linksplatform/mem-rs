@@ -205,6 +205,7 @@ define_impls! {
     } for [
         grow as grow_test,
         grow_with as grow_with_test,
+        allocated as allocated_test,
     ]
 }
 
@@ -216,6 +217,13 @@ fn grow<T>(mut mem: impl RawMem<Item = T>) {
 }
 
 fn grow_with<T: Copy + From<u8>>(mut mem: impl RawMem<Item = T>) {
+    let value = T::from(2);
+    mem.grow_with(10, || value).expect("grow");
+    assert!(mem.allocated().len() == 10);
+}
+
+fn allocated<T: Copy + From<u8>>(mut mem: impl RawMem<Item = T>) {
+    assert_eq!(mem.allocated().len(), 0);
     let value = T::from(2);
     mem.grow_with(10, || value).expect("grow");
     assert!(mem.allocated().len() == 10);
