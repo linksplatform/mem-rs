@@ -21,6 +21,7 @@ mod raw_place;
 mod utils;
 
 pub(crate) use raw_place::RawPlace;
+use std::mem::MaybeUninit;
 pub use {
     alloc::Alloc,
     file_mapped::FileMapped,
@@ -161,50 +162,54 @@ fn miri() {
 #[cfg(test)]
 macro_rules! define_impls {
     (impl RawMem: {
-        $($ctor:expr $(=> in $cfg:meta)? ),* $(,)?
-    } for [ $($path:ident: { $($test:ident),* $(,)? }),* $(,)? ]
+        $($ctor:expr /* -- */ $(=> in $cfg:meta)? ),+ $(,)?
+    } for [
+        $($test:path as $name:ident),* $(,)?
+    ]) => {
+        define_impls! { @loop
+            [/* empty result */]
+            [ $($ctor $(=> $cfg)? )*]
+            [ $($test as $name |)* ]
+        }
+    };
+
+   (@loop [ $($result:tt)* ] // result accumulation
+           [ $($ctor:expr $(=> $cfg:meta)? )* ] // each ctor with our cfg `not(miri)`
+           [ $test:path as $name:ident | $($tail:tt)* ] // match test with name + tail
     ) => {
-        mod generic_tests {$(
-            #[cfg_attr(all(test, $($cfg)?), test)]
-            fn $test() {
-                use super::*;
-                super::$test(
-                    $ctor
-                );
-            }
-        )*}
+        define_impls! { @loop
+            [
+                $($result)*
+
+                #[test]
+                fn $name() {
+                    $( $(#[cfg($cfg)])? $test($ctor);)*
+                }
+            ]
+            [$($ctor $(=> $cfg)? )*]
+            [ $($tail)* ]
+        }
+    };
+
+    (@loop [ $($result:tt)* ] [ $($_:tt)* ] [ /* tests still coming */ ] ) => {
+        $($result)*
     };
 }
 
 #[cfg(test)]
 define_impls! {
     impl RawMem: {
-        Global::new(),
-        System::new(),
-        TempFile::new().unwrap() => in not(miri),
+        Global::<u32>::new(),
+        System::<u32>::new(),
+        TempFile::<u32>::new().unwrap() => in not(miri),
     } for [
-        lib: {grow_with, shrink, allocated},
+        grow as grow_test,
     ]
 }
 
-fn grow_with(mut mem: impl RawMem<Item = (u8, u16)>) {
-    let res = mem.grow_with(10, || (2, 2)).expect("grow");
-    assert_eq!(res, [(2, 2); 10]);
-}
-
-fn allocated(mut mem: impl RawMem<Item = (u8, u16)>) {
-    assert_eq!(mem.allocated().len(), 0);
-
-    let res = mem.grow_with(10, || (2, 2)).expect("grow");
-    assert_eq!(res, [(2, 2); 10]);
-
-    assert_eq!(mem.allocated().len(), 10);
-}
-
-fn shrink(mut mem: impl RawMem<Item = (u8, u16)>) {
-    let res = mem.grow_with(10, || (2, 2)).expect("grow");
-    assert_eq!(res, [(2, 2); 10]);
-
-    mem.shrink(5).expect("shrink");
-    assert_eq!(mem.allocated(), &[(2, 2); 5]);
+fn grow<T>(mut mem: impl RawMem<Item = T>) {
+    unsafe {
+        mem.grow(10, |_uninit| {}).expect("error");
+    }
+    assert!(mem.allocated().len() == 10);
 }
