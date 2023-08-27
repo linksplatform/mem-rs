@@ -18,11 +18,12 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T, A: Allocator> Alloc<T, A> {
-    /// Creates a new `Alloc` with the given allocator.
-    /// # Examples
-    /// ```
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
+    /// Construct a new empty `Alloc<T, A>`.
+    /// It will not allocate until [growing][RawMem::grow].
+    /// ```compile_fail -- isn't supported ZSTs now
+    /// # use platform_mem::Global;
+    /// // It's able to be static
+    /// static ALLOC: Global<()> = Global::new();
     /// ```
     pub const fn new(alloc: A) -> Self {
         Self { buf: RawPlace::dangling(), alloc }
@@ -31,23 +32,11 @@ impl<T, A: Allocator> Alloc<T, A> {
 
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
-    /// Returns a slice of the allocated memory.
-    /// # Examples
-    /// ```
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
-    /// let slice = alloc.allocated();
-    /// ```
+
     fn allocated(&self) -> &[Self::Item] {
         unsafe { self.buf.as_slice() }
     }
-    /// Returns a mutable slice of the allocated memory.
-    /// # Examples
-    /// ```
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
-    /// let slice = alloc.allocated_mut();
-    /// ```
+
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
         unsafe { self.buf.as_slice_mut() }
     }
@@ -70,22 +59,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
 
         Ok(self.buf.handle_fill(ptr, cap, fill))
     }
-    /// Shrinks the capacity of the allocated memory to `cap`.
-    /// # Panics
-    /// Panics if `cap` is larger than the current capacity.
-    /// ```
-    /// should_panic
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
-    /// alloc.shrink(1);
-    /// ```
-    ///
-    /// # Examples
-    /// ```
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
-    /// alloc.shrink(0);
-    /// ```
+
     fn shrink(&mut self, cap: usize) -> Result<()> {
         let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
 
@@ -112,13 +86,6 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
 }
 
 impl<T, A: Allocator> Drop for Alloc<T, A> {
-    /// Deallocates the allocated memory.
-    /// # Examples
-    /// ```
-    /// use platform_mem::{Global};
-    /// let mut alloc = Global::new();
-    /// drop(alloc);
-    /// ```
     fn drop(&mut self) {
         unsafe {
             if let Some((ptr, layout)) = self.buf.current_memory() {

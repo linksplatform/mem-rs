@@ -90,12 +90,12 @@ use std::{
 
 delegate_memory! {
     Global<T>(Alloc<T, GlobalAlloc>) {
-        pub fn new() -> Self {
+        pub const fn new() -> Self {
             Self(Alloc::new(GlobalAlloc))
         }
     }
    System<T>(Alloc<T, SystemAlloc>) {
-       pub fn new() -> Self {
+       pub const fn new() -> Self {
            Self(Alloc::new(SystemAlloc))
        }
    }
