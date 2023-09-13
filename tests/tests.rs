@@ -1,5 +1,3 @@
-use {platform_mem::RawMem, std::io::Error};
-
 macro_rules! define_impls {
     (impl RawMem: {
         $($ctor:expr /* -- */ $(=> in $cfg:meta)? ),+ $(,)?
