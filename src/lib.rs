@@ -7,6 +7,7 @@
     inline_const,
     min_specialization
 )]
+#![feature(maybe_uninit_write_slice)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
