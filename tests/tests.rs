@@ -1,3 +1,5 @@
+use {platform_mem::RawMem, std::io::Error};
+
 macro_rules! define_impls {
     (impl RawMem: {
         $($ctor:expr /* -- */ $(=> in $cfg:meta)? ),+ $(,)?
@@ -53,8 +55,8 @@ use {
     std::fmt::Debug,
 };
 
+mod mem;
 mod miri;
-
 #[cfg(test)]
 define_impls! {
     impl RawMem: {
@@ -62,6 +64,7 @@ define_impls! {
         System::new(),
         TempFile::new().unwrap() => in not(miri),
     } for [
-        miri::miri as miri
+        miri::miri as miri,
+        mem::mem as mem,
     ]
 }
