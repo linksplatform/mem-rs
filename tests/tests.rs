@@ -63,6 +63,6 @@ define_impls! {
         TempFile::new().unwrap() => in not(miri),
     } for [
         miri::miri as miri,
-        mem::mem as mem,
+        mem::grow_from_slice as grow_from_slice,
     ]
 }

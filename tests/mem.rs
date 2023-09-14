@@ -1,9 +1,11 @@
-use {platform_mem::RawMem, std::error::Error};
+use {
+    platform_mem::RawMem,
+    std::{error, result},
+};
 
-type Result = std::result::Result<(), Box<dyn Error>>;
+#[allow(dead_code)]
+type Result = result::Result<(), Box<dyn error::Error>>;
 
-pub fn mem(mut mem: impl RawMem<Item = String>) -> Result {
-    assert_eq!(&["hello world".to_string()], mem.grow_from_slice(&["hello world".to_string()])?);
-
-    Ok(())
+pub fn grow_from_slice(mut mem: impl RawMem<Item = u8>) {
+    assert_eq!(b"hello world", mem.grow_from_slice(b"hello world").unwrap());
 }
