@@ -6,10 +6,10 @@
     ptr_as_uninit,
     inline_const,
     slice_range,
-    maybe_uninit_write_slice
+    maybe_uninit_write_slice,
+    unboxed_closures,
+    fn_traits
 )]
-#![feature(unboxed_closures)]
-#![feature(fn_traits)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
