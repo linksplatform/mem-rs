@@ -8,6 +8,8 @@
     slice_range,
     maybe_uninit_write_slice
 )]
+#![feature(unboxed_closures)]
+#![feature(fn_traits)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
@@ -24,7 +26,7 @@ pub(crate) use raw_place::RawPlace;
 pub use {
     alloc::Alloc,
     file_mapped::FileMapped,
-    raw_mem::{Error, RawMem, Result},
+    raw_mem::{ErasedMem, Error, RawMem, Result},
 };
 
 fn _assertion() {
@@ -190,4 +192,20 @@ fn yet() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn _is_raw_mem() {
+    fn check<T: RawMem>() {}
+
+    check::<Box<dyn ErasedMem<Item = ()>>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync + Send>>();
+
+    fn elie() -> Box<Global<()>> {
+        todo!()
+    }
+
+    let _: Box<dyn ErasedMem<Item = ()>> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync + Send> = elie();
 }

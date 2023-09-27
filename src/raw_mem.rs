@@ -238,6 +238,113 @@ pub trait RawMem {
     }
 }
 
+struct Unique<T>(MaybeUninit<T>);
+
+impl<T> Unique<T> {
+    pub unsafe fn assume(unique: T) -> Self {
+        Self(MaybeUninit::new(unique))
+    }
+}
+
+impl<A, B, F: FnOnce(A, B)> FnOnce<(A, B)> for Unique<F> {
+    type Output = ();
+
+    extern "rust-call" fn call_once(self, args: (A, B)) -> Self::Output {
+        unsafe { self.0.assume_init().call_once(args) }
+    }
+}
+
+impl<A, B, F: FnOnce(A, B)> FnMut<(A, B)> for Unique<F> {
+    extern "rust-call" fn call_mut(&mut self, args: (A, B)) -> Self::Output {
+        unsafe { self.0.assume_init_read().call_once(args) }
+    }
+}
+
+pub unsafe trait ErasedMem {
+    type Item;
+
+    fn erased_allocated(&self) -> &[Self::Item];
+    fn erased_allocated_mut(&mut self) -> &mut [Self::Item];
+
+    unsafe fn erased_grow(
+        &mut self,
+        cap: usize,
+        fill: &mut dyn FnMut(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+    ) -> Result<&mut [Self::Item]>;
+
+    fn erased_shrink(&mut self, cap: usize) -> Result<()>;
+
+    fn erased_size_hint(&self) -> Option<usize> {
+        None
+    }
+}
+
+macro_rules! impl_erased {
+    ($ty:ty => $($imp:tt)+) => {
+        impl $($imp)+ {
+            type Item = $ty;
+
+            fn allocated(&self) -> &[Self::Item] {
+                (**self).erased_allocated()
+            }
+
+            fn allocated_mut(&mut self) -> &mut [Self::Item] {
+                (**self).erased_allocated_mut()
+            }
+
+            unsafe fn grow(
+                &mut self,
+                cap: usize,
+                fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+            ) -> Result<&mut [Self::Item]> {
+                (**self).erased_grow(cap, unsafe { &mut Unique::assume(fill) })
+            }
+
+            fn shrink(&mut self, cap: usize) -> Result<()> {
+                (**self).erased_shrink(cap)
+            }
+
+            fn size_hint(&self) -> Option<usize> {
+                (**self).erased_size_hint()
+            }
+        }
+    };
+}
+
+impl_erased!(All::Item => <'a, All: ?Sized + RawMem> RawMem for &'a mut All);
+
+impl_erased!(I => <'a, I> RawMem for Box<dyn ErasedMem<Item = I> + 'a>);
+impl_erased!(I => <'a, I> RawMem for Box<dyn ErasedMem<Item = I> + Sync + 'a>);
+impl_erased!(I => <'a, I> RawMem for Box<dyn ErasedMem<Item = I> + Sync + Send + 'a>);
+
+unsafe impl<All: RawMem + ?Sized> ErasedMem for All {
+    type Item = All::Item;
+
+    fn erased_allocated(&self) -> &[Self::Item] {
+        self.allocated()
+    }
+
+    fn erased_allocated_mut(&mut self) -> &mut [Self::Item] {
+        self.allocated_mut()
+    }
+
+    unsafe fn erased_grow(
+        &mut self,
+        cap: usize,
+        fill: &mut dyn FnMut(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+    ) -> Result<&mut [Self::Item]> {
+        self.grow(cap, fill)
+    }
+
+    fn erased_shrink(&mut self, cap: usize) -> Result<()> {
+        self.shrink(cap)
+    }
+
+    fn erased_size_hint(&self) -> Option<usize> {
+        self.size_hint()
+    }
+}
+
 pub mod uninit {
     use std::{mem, mem::MaybeUninit, ptr};
 
