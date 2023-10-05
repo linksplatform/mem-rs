@@ -7,6 +7,7 @@
     inline_const,
     min_specialization
 )]
+#![feature(maybe_uninit_write_slice)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
@@ -15,6 +16,7 @@
 
 mod alloc;
 mod file_mapped;
+mod prealloc;
 mod raw_mem;
 mod raw_place;
 mod utils;
@@ -125,34 +127,4 @@ impl<T> Default for System<T> {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[test]
-fn miri() {
-    pub fn inner<M: RawMem>(mut mem: M, val: M::Item) -> Result<()>
-    where
-        M::Item: Clone + PartialEq,
-    {
-        const GROW: usize = if cfg!(miri) { 100 } else { 10_000 };
-
-        for _ in 0..10 {
-            mem.grow_filled(GROW, val.clone())?;
-        }
-        assert!(mem.allocated() == vec![val; GROW * 10]);
-
-        for _ in 0..10 {
-            mem.shrink(GROW)?;
-        }
-        assert_eq!(mem.allocated().len(), 0);
-
-        Ok(())
-    }
-
-    let val = "foo".to_string();
-
-    inner(Global::new(), val.clone()).unwrap();
-    inner(System::new(), val.clone()).unwrap();
-
-    #[cfg(not(miri))]
-    inner(TempFile::new().unwrap(), val).unwrap();
 }

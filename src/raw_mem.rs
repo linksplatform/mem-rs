@@ -291,4 +291,15 @@ pub trait RawMem {
     /// # Result::Ok(())
     /// ```
     fn shrink(&mut self, cap: usize) -> Result<()>;
+
+    fn grow_from_slice(&mut self, src: &[Self::Item]) -> Result<&mut [Self::Item]>
+        where
+            Self::Item: Clone,
+    {
+        unsafe {
+            self.grow(src.len(), |uninit| {
+                MaybeUninit::write_slice_cloned(uninit, src);
+            })
+        }
+    }
 }
