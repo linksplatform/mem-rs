@@ -20,7 +20,7 @@ pub struct Alloc<T, A: Allocator> {
 impl<T, A: Allocator> Alloc<T, A> {
     /// Construct a new empty `Alloc<T, A>`.
     /// It will not allocate until [growing][RawMem::grow].
-    /// ```compile_fail -- isn't supported ZSTs now
+    /// ```
     /// # use platform_mem::Global;
     /// // It's able to be static
     /// static ALLOC: Global<()> = Global::new();

@@ -1,32 +1,14 @@
-use {
-    mem::size_of,
-    std::{
-        alloc::Layout,
-        mem::{self, MaybeUninit},
-        ptr,
-    },
+use std::{
+    alloc::Layout,
+    mem::MaybeUninit,
+    ops::{Range, RangeBounds},
+    slice,
 };
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
-
-struct Guard<'a, T> {
-    slice: &'a mut [MaybeUninit<T>],
-    init: usize,
-}
-
-impl<'a, T> Drop for Guard<'a, T> {
-    fn drop(&mut self) {
-        // SAFETY: this raw slice will contain only initialized objects
-        // that's why, it is allowed to drop it.
-        unsafe {
-            ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(&mut self.slice[..self.init]));
-        }
-    }
-}
-
 pub enum Error {
     /// Error due to the computed capacity exceeding the maximum
     /// (usually `isize::MAX` bytes).
@@ -251,6 +233,17 @@ pub trait RawMem {
         unsafe {
             self.grow(end - start, |_, (within, uninit)| {
                 MaybeUninit::write_slice_cloned(uninit, &within[start..end]);
+            })
+        }
+    }
+
+    fn grow_from_slice(&mut self, src: &[Self::Item]) -> Result<&mut [Self::Item]>
+    where
+        Self::Item: Clone,
+    {
+        unsafe {
+            self.grow(src.len(), |_, (_, uninit)| {
+                MaybeUninit::write_slice_cloned(uninit, src);
             })
         }
     }
