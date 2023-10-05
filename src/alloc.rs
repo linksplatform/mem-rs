@@ -44,8 +44,8 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
     unsafe fn grow(
         &mut self,
         addition: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
-    ) -> Result<&mut [Self::Item]> {
+        fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
+    ) -> Result<&mut [T]> {
         let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
         let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
 
@@ -57,7 +57,8 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
         .cast();
 
-        Ok(self.buf.handle_fill(ptr, cap, fill))
+        // allocator always provide uninit memory
+        Ok(self.buf.handle_fill((ptr, cap), 0, fill))
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()> {

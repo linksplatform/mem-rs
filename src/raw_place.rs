@@ -51,9 +51,9 @@ impl<T> RawPlace<T> {
 
     pub unsafe fn handle_fill(
         &mut self,
-        ptr: NonNull<T>,
-        cap: usize,
-        fill: impl FnOnce(&mut [MaybeUninit<T>]),
+        (ptr, cap): (NonNull<T>, usize),
+        inited: usize,
+        fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
     ) -> &mut [T] {
         // fixme: ZST correctness isn't checked now,
         // it forbid growing, but allow `RawPlace::<ZST>::dangling` and thus `Alloc::<ZST>::new`'s
@@ -67,7 +67,9 @@ impl<T> RawPlace<T> {
         self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
         //                 ( alloc memory )
 
-        fill(uninit); // panic out!
+        // slice from `as_slice_mut` will be the initialized part of owned memory
+        // while (&mut [T], &mut [MaybeUninit<T>]) will be the full memory
+        fill(inited, (self.as_slice_mut(), uninit)); // panic out!
 
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 

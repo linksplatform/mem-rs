@@ -5,9 +5,11 @@
     slice_ptr_get,
     ptr_as_uninit,
     inline_const,
-    min_specialization
+    slice_range,
+    maybe_uninit_write_slice,
+    unboxed_closures,
+    fn_traits
 )]
-#![feature(maybe_uninit_write_slice)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
@@ -16,7 +18,6 @@
 
 mod alloc;
 mod file_mapped;
-mod prealloc;
 mod raw_mem;
 mod raw_place;
 mod utils;
@@ -25,7 +26,7 @@ pub(crate) use raw_place::RawPlace;
 pub use {
     alloc::Alloc,
     file_mapped::FileMapped,
-    raw_mem::{Error, RawMem, Result},
+    raw_mem::{ErasedMem, Error, RawMem, Result},
 };
 
 fn _assertion() {
@@ -63,13 +64,17 @@ macro_rules! delegate_memory {
                 unsafe fn grow(
                     &mut self,
                     addition: usize,
-                    fill: impl FnOnce(&mut [MaybeUninit<Self::Item>]),
+                    fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
                 ) -> Result<&mut [Self::Item]> {
                     self.0.grow(addition, fill)
                 }
 
                 fn shrink(&mut self, cap: usize) -> Result<()> {
                     self.0.shrink(cap)
+                }
+
+                fn size_hint(&self) -> Option<usize> {
+                    self.0.size_hint()
                 }
             }
 
@@ -127,4 +132,20 @@ impl<T> Default for System<T> {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn _is_raw_mem() {
+    fn check<T: RawMem>() {}
+
+    check::<Box<dyn ErasedMem<Item = ()>>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync + Send>>();
+
+    fn elie() -> Box<Global<()>> {
+        todo!()
+    }
+
+    let _: Box<dyn ErasedMem<Item = ()>> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync + Send> = elie();
 }
