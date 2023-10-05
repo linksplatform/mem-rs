@@ -4,8 +4,14 @@ use std::{
     ptr,
 };
 
-/// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
+/// The `Error` error indicates [*growing*]/[*shrinking*] failure of the [`RawMem`]
+/// that may be due by implementation details.
+///
+/// E.g allocation failure or I/O error
+///
+/// [*growing*]: RawMem::grow
+/// [*shrinking*]: RawMem::shrink
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -17,13 +23,13 @@ pub enum Error {
     /// grow more than `isize::MAX` bytes:
     ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// # #![feature(assert_matches)]
-    /// # use std::alloc::Global;
-    /// # use std::assert_matches::assert_matches;
-    /// # use platform_mem::{Error, Alloc, RawMem};
-    /// let mut mem = Alloc::new(Global);
-    /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
+    /// # use platform_mem::{Error, Alloc, RawMem, Global};
+    /// let mut alloc = Global::new();
+    ///
+    /// match alloc.grow_filled(usize::MAX, 0u64) {
+    ///     Err(Error::CapacityOverflow) => {}
+    ///     _ => unreachable!()
+    /// }
     /// ```
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
@@ -33,7 +39,7 @@ pub enum Error {
 
     /// The memory allocator returned an error
     #[error("memory allocation of {layout:?} failed")]
-    Alloc {
+    AllocError {
         /// The layout of allocation request that failed
         layout: Layout,
 
@@ -67,69 +73,30 @@ impl<T> Drop for Guard<'_, T> {
     }
 }
 
-/// Defines a low-level API for working with memory allocations. It provides methods for growing, shrinking, and initializing memory in various ways.
-/// # Features
-///
-/// * The [`allocated`][allocated] and [`allocated_mut`][allocated_mut] methods provide access to the allocated memory.
-/// * The [`grow`][grow] method allows you to increase the capacity of memory and initialize it using a provided closure.
-/// * The [`grow_assumed`][grow_assumed] method is a version of grow that assumes the memory is already initialized.
-/// * The [`grow_zeroed`][grow_zeroed] method increases the capacity of memory and initializes it with zeroes.
-/// * The [`grow_with`][grow_with] method increases the capacity of memory and initializes it with the result of a given closure.
-/// * The [`grow_filled`][grow_filled] method increases the capacity of memory and initializes it with a given value.
-/// * The [`shrink`][shrink] method decreases the capacity of memory to fit its length.
-///
-/// [allocated]: Self::allocated
-/// [allocated_mut]: Self::allocated_mut
-/// [grow]: Self::grow
-/// [grow_assumed]: Self::grow_assumed
-/// [grow_zeroed]: Self::grow_zeroed
-/// [grow_with]: Self::grow_with
-/// [grow_filled]: Self::grow_filled
-/// [shrink]: Self::shrink
-///
-/// # Examples
-/// ```
-/// # #![feature(allocator_api)]
-/// # use std::alloc::Global;
-/// # use std::mem::MaybeUninit;
-/// # use platform_mem::Result;
-/// use platform_mem::{Alloc, RawMem};
-///
-/// let mut alloc = Alloc::new(Global);
-/// unsafe {
-/// alloc.grow(10, |uninit| {
-///     for item in uninit {
-///         item.write(1);
-///     }
-///  })?;
-/// }
-/// # Result::Ok(())
-/// ```
+/// Defines a low-level API for working with memory places.
 pub trait RawMem {
     type Item;
 
     fn allocated(&self) -> &[Self::Item];
+
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
     /// Caller must guarantee that `fill` makes the uninitialized part valid for
     /// [`MaybeUninit::slice_assume_init_mut`]
     ///
-    /// ### Incorrect usage
+    /// ## Incorrect usage
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    /// # use std::alloc::Global;
-    /// # use std::mem::MaybeUninit;
-    /// # use platform_mem::Result;
-    /// use platform_mem::{Alloc, RawMem};
-    ///
-    /// let mut alloc = Alloc::new(Global);
-    /// unsafe {
-    ///     alloc.grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
-    ///         // `RawMem` relies on the fact that we initialize memory
-    ///         // even if they are primitives
-    ///     })?;
-    /// }
+    /// # use {
+    /// #     std::mem::MaybeUninit,
+    /// #     platform_mem::{Result, Global, RawMem},
+    /// # };
+    /// # unsafe {
+    /// Global::new().grow(10, |_uninit: &mut [MaybeUninit<u64>]| {
+    /// // `RawMem` relies on the fact that we initialize memory
+    /// //  even if they are primitive types
+    /// })?;
+    /// # }
     /// # Result::Ok(())
     /// ```
     unsafe fn grow(
@@ -151,9 +118,7 @@ pub trait RawMem {
     /// # Examples
     ///
     /// ```no_run
-    /// # use platform_mem::Result;
-    /// use platform_mem::{FileMapped, RawMem};
-    ///
+    /// # use platform_mem::{FileMapped, RawMem, Result};
     /// let mut file = FileMapped::from_path("..")?;
     /// // file is always represents as initialized bytes
     /// // and usize is transparent as bytes
@@ -176,31 +141,24 @@ pub trait RawMem {
     /// # Examples
     /// Correct usage of this function: initializing an integral-like types with zeroes:
     /// ```
-    /// # #![feature(allocator_api)]
-    /// # use platform_mem::Error;
-    /// use platform_mem::{Global, RawMem};
-    ///
-    /// let mut alloc = Global::new();
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// # let mut alloc = Global::new();
     /// let zeroes: &mut [(u8, u16)] = unsafe {
     ///     alloc.grow_zeroed(10)?
     /// };
-    ///
     /// assert_eq!(zeroes, [(0, 0); 10]);
-    /// # Ok::<_, Error>(())
+    /// # Result::Ok(())
     /// ```
     ///
     /// Incorrect usage of this function: initializing a reference with zero:
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    ///  # use platform_mem::Error;
-    /// use platform_mem::{Global, RawMem};
-    ///
-    /// let mut alloc = Global::new();
-    /// let _: &mut [&'static str] = unsafe {
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// # let mut alloc = Global::new();
+    /// let zeroes: &mut [&'static str] = unsafe {
     ///     alloc.grow_zeroed(10)? // Undefined behavior!
     /// };
     ///
-    /// # Ok::<_, Error>(())
+    /// # Result::Ok(())
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
@@ -208,22 +166,20 @@ pub trait RawMem {
             uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
         })
     }
-    /// Fill the memory with the result of the closure.
+
+    /// [`grow`] which fills grown memory with elements returned by calling a closure repeatedly.
     ///
     /// # Examples
-    /// Correct usage of this function:
+    ///
+    /// It's possible to use it like potential `grow_default` with [`Default::default`]
     /// ```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// let res: &mut [(u8, u16)] = unsafe {
-    ///    alloc.grow_with(10, || {
-    ///       (2, 2)
-    ///   })?
-    /// };
-    /// assert_eq!(res, [(2, 2); 10]);
-    /// # Ok::<_, Error>(())
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// # let mut alloc = Global::new();
+    /// assert_eq!(alloc.grow_with(10, <f32>::default)?, [0.0; 10]);
+    /// assert_eq!(alloc.grow_with(10, || 0.0f32)?, [0.0; 10]);
+    /// # Result::Ok(())
     /// ```
+    /// [`grow`]: Self::grow
     fn grow_with(
         &mut self,
         addition: usize,
@@ -245,19 +201,21 @@ pub trait RawMem {
             })
         }
     }
-    /// Fills initialized memory with a given value.
+    /// [`grow`] which fills grown memory with elements by cloning `value`.
+    ///
     /// # Examples
-    /// Correct usage of this function:
+    ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// let res: &mut [(u8, u16)] = unsafe {
-    ///   alloc.grow_filled(10, (2, 2))?
-    /// };
-    /// assert_eq!(res, [(2, 2); 10]);
-    /// # Ok::<_, Error>(())
+    /// # use platform_mem::{Result, Global, RawMem};
+    /// # let mut alloc = Global::new();
+    /// assert_eq!(
+    ///     alloc.grow_filled(10, String::from("hello"))?,
+    ///     ["hello"; 10]
+    /// );
+    ///
+    /// # Result::Ok(())
     /// ```
+    /// [`grow`]: Self::grow
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -301,20 +259,36 @@ pub trait RawMem {
             })
         }
     }
-    /// Shrinks the capacity of the memory to fit its length.
+
+    // fixme(modern-api-provides): use `grow_from_slice` in example
+    /// Attempts to shrink the last `cap` elements
+    ///
+    /// Keep in mind that [`shrink`] implies a memory shrink. For example:
+    /// - [`Alloc`] uses [`Allocator::shrink`], which almost always causes reallocation
+    /// - [`FileMapped`] implementation shrinks a file instead of changing inner capacity.
+    ///
+    /// # Errors
+    ///
+    /// Default implementations panicking if `cap` less than available memory.
+    /// This is not the final behavior, perhaps in the future an error type will be added for this
+    /// (or [`Error::CapacityOverflow`] will be used)
+    ///
+    /// [`Allocator::shrink`]: std::alloc::Allocator::shrink
+    /// [`FileMapped`]: crate::FileMapped
+    /// [`shrink`]: Self::shrink
+    /// [`Alloc`]: crate::Alloc
+    ///
     /// # Examples
+    ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// use platform_mem::{Global, RawMem};
-    /// let mut alloc = Global::new();
-    /// let mut res: &mut [(u8, u16)] = unsafe {
-    ///  alloc.grow(10, || {
-    ///    (2, 2)
-    /// })?
-    /// };
-    /// res.shrink(5)?;
-    /// assert_eq!(res, [(2, 2); 5]);
-    /// # Ok::<_, Error>(())
+    /// # use platform_mem::{Global, RawMem, Result};
+    /// let mut mem = Global::new();
+    ///
+    /// mem.grow_filled(10, 0)?;
+    /// mem.shrink(3)?;
+    ///
+    /// assert_eq!(mem.allocated(), [0u8; 7]);
+    /// # Result::Ok(())
     /// ```
     fn shrink(&mut self, cap: usize) -> Result<()>;
 

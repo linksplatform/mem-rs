@@ -19,6 +19,7 @@ pub struct FileMapped<T> {
 }
 
 impl<T> FileMapped<T> {
+    // todo: say about mapping, read-write guarantees, and `MIN_PAGE_SIZE`
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 

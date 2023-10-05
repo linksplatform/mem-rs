@@ -31,7 +31,6 @@ impl<T> RawPlace<T> {
         slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
     }
 
-    // we change `ptr`/`cap` only in provided functions, so it's safe
     pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         // rust does not support such types,
         // so we can do better by skipping some checks and avoid an unwrap.

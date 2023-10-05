@@ -1,7 +1,7 @@
 use {
     crate::{
         utils,
-        Error::{self, CapacityOverflow},
+        Error::{AllocError, CapacityOverflow},
         RawMem, RawPlace, Result,
     },
     std::{
@@ -18,6 +18,13 @@ pub struct Alloc<T, A: Allocator> {
 }
 
 impl<T, A: Allocator> Alloc<T, A> {
+    /// Construct a new empty `Alloc<T, A>`.
+    /// It will not allocate until [growing][RawMem::grow].
+    /// ```compile_fail -- isn't supported ZSTs now
+    /// # use platform_mem::Global;
+    /// // It's able to be static
+    /// static ALLOC: Global<()> = Global::new();
+    /// ```
     pub const fn new(alloc: A) -> Self {
         Self { buf: RawPlace::dangling(), alloc }
     }
@@ -47,7 +54,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         } else {
             self.alloc.allocate(new_layout)
         }
-        .map_err(|_| Error::Alloc { layout: new_layout, non_exhaustive: () })?
+        .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
         .cast();
 
         Ok(self.buf.handle_fill(ptr, cap, fill))
@@ -68,7 +75,7 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
             let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
             self.alloc
                 .shrink(ptr, layout, new_layout)
-                .map_err(|_| Error::Alloc { layout: new_layout, non_exhaustive: () })?
+                .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
         };
 
         #[allow(clippy::unit_arg)] // it is allows shortest return `Ok(())`
