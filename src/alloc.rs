@@ -1,87 +1,104 @@
-use crate::{base::Base, internal, RawMem, Result};
-use std::{
-    alloc::{Allocator, Layout},
-    cmp::Ordering,
-    ptr::{drop_in_place, NonNull},
+use {
+    crate::{
+        utils,
+        Error::{AllocError, CapacityOverflow},
+        RawMem, RawPlace, Result,
+    },
+    std::{
+        alloc::{Allocator, Layout},
+        fmt::{self, Debug, Formatter},
+        mem::{self, MaybeUninit},
+        ptr,
+    },
 };
-use tap::Pipe;
 
 pub struct Alloc<T, A: Allocator> {
-    base: Base<T>,
+    buf: RawPlace<T>,
     alloc: A,
 }
 
-impl<T: Default, A: Allocator> Alloc<T, A> {
+impl<T, A: Allocator> Alloc<T, A> {
+    /// Construct a new empty `Alloc<T, A>`.
+    /// It will not allocate until [growing][RawMem::grow].
+    /// ```
+    /// # use platform_mem::Global;
+    /// // It's able to be static
+    /// static ALLOC: Global<()> = Global::new();
+    /// ```
     pub const fn new(alloc: A) -> Self {
-        Self {
-            base: Base::dangling(),
-            alloc,
-        }
-    }
-
-    unsafe fn alloc_impl(&mut self, capacity: usize) -> Result<&mut [T]> {
-        let old_capacity = self.base.ptr.len();
-        let new_capacity = capacity;
-
-        let result: Result<_> = try {
-            if self.base.ptr.as_non_null_ptr() == NonNull::dangling() {
-                let layout = Layout::array::<T>(capacity)?;
-                self.alloc.allocate(layout)?
-            } else {
-                let old_layout = Layout::array::<T>(old_capacity)?;
-                let new_layout = Layout::array::<T>(new_capacity)?;
-
-                let ptr = internal::to_bytes(self.base.ptr);
-                match new_capacity.cmp(&old_capacity) {
-                    Ordering::Less => {
-                        self.base.handle_narrow(new_capacity);
-                        self.alloc
-                            .shrink(ptr.as_non_null_ptr(), old_layout, new_layout)?
-                    }
-                    Ordering::Greater => {
-                        self.alloc
-                            .grow(ptr.as_non_null_ptr(), old_layout, new_layout)?
-                    }
-                    Ordering::Equal => ptr,
-                }
-            }
-        };
-
-        result.map(|ptr| {
-            self.base.ptr = internal::guaranteed_from_bytes(ptr);
-            self.base.handle_expand(old_capacity);
-            self.base.ptr.as_mut()
-        })
+        Self { buf: RawPlace::dangling(), alloc }
     }
 }
 
-impl<T: Default, A: Allocator> RawMem<T> for Alloc<T, A> {
-    fn alloc(&mut self, capacity: usize) -> Result<&mut [T]> {
-        unsafe { self.alloc_impl(capacity) }
+impl<T, A: Allocator> RawMem for Alloc<T, A> {
+    type Item = T;
+
+    fn allocated(&self) -> &[Self::Item] {
+        unsafe { self.buf.as_slice() }
     }
 
-    fn allocated(&self) -> usize {
-        self.base.allocated()
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
+        unsafe { self.buf.as_slice_mut() }
+    }
+
+    unsafe fn grow(
+        &mut self,
+        addition: usize,
+        fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
+    ) -> Result<&mut [T]> {
+        let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
+        let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
+
+        let ptr = if let Some((ptr, old_layout)) = self.buf.current_memory() {
+            self.alloc.grow(ptr, old_layout, new_layout)
+        } else {
+            self.alloc.allocate(new_layout)
+        }
+        .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+        .cast();
+
+        // allocator always provide uninit memory
+        Ok(self.buf.handle_fill((ptr, cap), 0, fill))
+    }
+
+    fn shrink(&mut self, cap: usize) -> Result<()> {
+        let cap = self.buf.cap().checked_sub(cap).expect("Tried to shrink to a larger capacity");
+
+        let Some((ptr, layout)) = self.buf.current_memory() else {
+            return Ok(());
+        };
+        self.buf.shrink_to(cap);
+
+        let ptr = unsafe {
+            // `Layout::array` cannot overflow here because it would have
+            // overflowed earlier when capacity was larger.
+            let new_size = mem::size_of::<T>().unchecked_mul(cap);
+            let new_layout = Layout::from_size_align_unchecked(new_size, layout.align());
+            self.alloc
+                .shrink(ptr, layout, new_layout)
+                .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+        };
+
+        #[allow(clippy::unit_arg)] // it is allows shortest return `Ok(())`
+        Ok({
+            self.buf.set_ptr(ptr);
+        })
     }
 }
 
 impl<T, A: Allocator> Drop for Alloc<T, A> {
     fn drop(&mut self) {
-        // SAFETY: ptr is valid slice
-        // SAFETY: items is friendly to drop
-        unsafe { self.base.ptr.as_mut().pipe(|slice| drop_in_place(slice)) }
-
-        let _: Result<_> = try {
-            let ptr = self.base.ptr;
-            let layout = Layout::array::<T>(ptr.len())?;
-            // SAFETY: ptr is valid slice
-            unsafe {
-                let ptr = ptr.as_non_null_ptr().cast();
+        unsafe {
+            if let Some((ptr, layout)) = self.buf.current_memory() {
+                ptr::drop_in_place(self.buf.as_slice_mut());
                 self.alloc.deallocate(ptr, layout);
             }
-        };
+        }
     }
 }
 
-unsafe impl<T: Sync, A: Allocator + Sync> Sync for Alloc<T, A> {}
-unsafe impl<T: Send, A: Allocator + Send> Send for Alloc<T, A> {}
+impl<T, A: Allocator + Debug> Debug for Alloc<T, A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        utils::debug_mem(f, &self.buf, "Alloc")?.field("alloc", &self.alloc).finish()
+    }
+}

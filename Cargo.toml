@@ -11,11 +11,9 @@ Memory for linksplatform
 """
 
 [dependencies]
-tap = "1.0"
-memmap2 = "0.5"
+memmap2 = "0.7"
 tempfile = "3.3"
 thiserror = "1.0"
-delegate = "0.7.0"
 
 [dev-dependencies]
 paste = "1.0"

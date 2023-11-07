@@ -1,77 +1,151 @@
-#![feature(const_nonnull_slice_from_raw_parts)]
-#![feature(nonnull_slice_from_raw_parts)]
-#![feature(allocator_api)]
-#![feature(default_free_fn)]
-#![feature(layout_for_ptr)]
-#![feature(slice_ptr_get)]
-#![feature(try_blocks)]
-#![feature(slice_ptr_len)]
-#![feature(io_error_other)]
-#![feature(const_trait_impl)]
-
+#![feature(
+    allocator_api,
+    unchecked_math,
+    maybe_uninit_slice,
+    slice_ptr_get,
+    ptr_as_uninit,
+    inline_const,
+    slice_range,
+    maybe_uninit_write_slice,
+    unboxed_closures,
+    fn_traits
+)]
+// special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
-#![warn(
-    clippy::perf,
-    clippy::single_match_else,
-    clippy::dbg_macro,
-    clippy::doc_markdown,
-    clippy::wildcard_imports,
-    clippy::struct_excessive_bools,
-    clippy::semicolon_if_nothing_returned,
-    clippy::pedantic,
-    clippy::nursery
-)]
-// for `clippy::pedantic`
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::missing_safety_doc,
-    clippy::let_underscore_drop,
-    clippy::non_send_fields_in_send_ty,
-)]
-#![deny(
-    clippy::all,
-    clippy::cast_lossless,
-    clippy::redundant_closure_for_method_calls,
-    clippy::use_self,
-    clippy::unnested_or_patterns,
-    clippy::trivially_copy_pass_by_ref,
-    clippy::needless_pass_by_value,
-    clippy::match_wildcard_for_single_variants,
-    clippy::map_unwrap_or,
-    unused_qualifications,
-    unused_import_braces,
-    unused_lifetimes,
-    // unreachable_pub,
-    trivial_numeric_casts,
-    // rustdoc,
-    // missing_debug_implementations,
-    // missing_copy_implementations,
-    deprecated_in_future,
-    meta_variable_misuse,
-    non_ascii_idents,
-    rust_2018_compatibility,
-    rust_2018_idioms,
-    future_incompatible,
-    nonstandard_style,
-)]
-// must be fixed later
-#![allow(clippy::needless_pass_by_value, clippy::comparison_chain)]
-
-pub use alloc::Alloc;
-pub use file_mapped::FileMapped;
-pub use global::Global;
-pub use prealloc::PreAlloc;
-pub use temp_file::TempFile;
-pub use traits::{Error, RawMem, Result, DEFAULT_PAGE_SIZE};
+// rust compiler lints
+#![deny(unused_must_use)]
+#![warn(missing_debug_implementations)]
 
 mod alloc;
-mod base;
 mod file_mapped;
-mod global;
-mod internal;
-mod prealloc;
-mod temp_file;
-mod traits;
+mod raw_mem;
+mod raw_place;
+mod utils;
 
-pub(crate) use base::Base;
+pub(crate) use raw_place::RawPlace;
+pub use {
+    alloc::Alloc,
+    file_mapped::FileMapped,
+    raw_mem::{ErasedMem, Error, RawMem, Result},
+};
+
+fn _assertion() {
+    fn assert_sync_send<T: Sync + Send>() {}
+
+    assert_sync_send::<FileMapped<()>>();
+    assert_sync_send::<Alloc<(), std::alloc::Global>>();
+}
+
+macro_rules! delegate_memory {
+    ($($me:ident<$param:ident>($inner:ty) { $($body:tt)* } )*) => {$(
+        pub struct $me<$param>($inner);
+
+        impl<$param> $me<$param> {
+            $($body)*
+        }
+
+        const _: () = {
+            use std::{
+                mem::MaybeUninit,
+                fmt::{self, Formatter},
+            };
+
+            impl<$param> RawMem for $me<$param> {
+                type Item = $param;
+
+                fn allocated(&self) -> &[Self::Item] {
+                    self.0.allocated()
+                }
+
+                fn allocated_mut(&mut self) -> &mut [Self::Item] {
+                    self.0.allocated_mut()
+                }
+
+                unsafe fn grow(
+                    &mut self,
+                    addition: usize,
+                    fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+                ) -> Result<&mut [Self::Item]> {
+                    self.0.grow(addition, fill)
+                }
+
+                fn shrink(&mut self, cap: usize) -> Result<()> {
+                    self.0.shrink(cap)
+                }
+
+                fn size_hint(&self) -> Option<usize> {
+                    self.0.size_hint()
+                }
+            }
+
+            impl<T> fmt::Debug for $me<$param> {
+                fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                    f.debug_tuple(stringify!($me)).field(&self.0).finish()
+                }
+            }
+
+        };
+    )*};
+}
+
+use std::{
+    alloc::{Global as GlobalAlloc, System as SystemAlloc},
+    fs::File,
+    io,
+    path::Path,
+};
+
+delegate_memory! {
+    Global<T>(Alloc<T, GlobalAlloc>) {
+        pub const fn new() -> Self {
+            Self(Alloc::new(GlobalAlloc))
+        }
+    }
+   System<T>(Alloc<T, SystemAlloc>) {
+       pub const fn new() -> Self {
+           Self(Alloc::new(SystemAlloc))
+       }
+   }
+   TempFile<T>(FileMapped<T>) {
+       pub fn new() -> io::Result<Self> {
+           Self::from_temp(tempfile::tempfile())
+       }
+
+       pub fn new_in<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+           Self::from_temp(tempfile::tempfile_in(path))
+       }
+
+       fn from_temp(file: io::Result<File>) -> io::Result<Self> {
+           file.and_then(FileMapped::new).map(Self)
+       }
+   }
+}
+
+// fixme: add flag when it needs in macro
+impl<T> Default for Global<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<T> Default for System<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn _is_raw_mem() {
+    fn check<T: RawMem>() {}
+
+    check::<Box<dyn ErasedMem<Item = ()>>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync>>();
+    check::<Box<dyn ErasedMem<Item = ()> + Sync + Send>>();
+
+    fn elie() -> Box<Global<()>> {
+        todo!()
+    }
+
+    let _: Box<dyn ErasedMem<Item = ()>> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync> = elie();
+    let _: Box<dyn ErasedMem<Item = ()> + Sync + Send> = elie();
+}
