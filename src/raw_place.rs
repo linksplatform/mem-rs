@@ -73,7 +73,7 @@ impl<T> RawPlace<T> {
 
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 
-        uninit.assume_init_mut()
+        MaybeUninit::slice_assume_init_mut(uninit)
     }
 
     pub fn shrink_to(&mut self, cap: usize) {
