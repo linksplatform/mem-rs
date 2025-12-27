@@ -58,7 +58,7 @@ pub trait RawMem {
 
     /// # Safety
     /// Caller must guarantee that `fill` makes the uninitialized part valid for
-    /// [`MaybeUninit::slice_assume_init_mut`]
+    /// [`assume_init_mut`](prim@slice#method.assume_init_mut)
     ///
     /// ### Incorrect usage
     /// ```no_run
@@ -128,7 +128,7 @@ pub trait RawMem {
     }
 
     /// # Safety
-    /// [`Item`] must satisfy [initialization invariant][inv] for [`mem::zeroed`]
+    /// [`Item`] must satisfy [initialization invariant][inv] for [`std::mem::zeroed`]
     ///
     /// [`Item`]: Self::Item
     ///  [inv]: MaybeUninit#initialization-invariant
@@ -232,7 +232,7 @@ pub trait RawMem {
         let Range { start, end } = slice::range(range, ..self.allocated().len());
         unsafe {
             self.grow(end - start, |_, (within, uninit)| {
-                MaybeUninit::write_slice_cloned(uninit, &within[start..end]);
+                uninit.write_clone_of_slice(&within[start..end]);
             })
         }
     }
@@ -243,7 +243,7 @@ pub trait RawMem {
     {
         unsafe {
             self.grow(src.len(), |_, (_, uninit)| {
-                MaybeUninit::write_slice_cloned(uninit, src);
+                uninit.write_clone_of_slice(src);
             })
         }
     }
@@ -396,9 +396,9 @@ pub mod uninit {
             // SAFETY: this raw slice will contain only initialized objects
             // that's why, it is allowed to drop it.
             unsafe {
-                ptr::drop_in_place(MaybeUninit::slice_assume_init_mut(
-                    self.slice.get_unchecked_mut(..self.init),
-                ));
+                ptr::drop_in_place(
+                    self.slice.get_unchecked_mut(..self.init).assume_init_mut(),
+                );
             }
         }
     }
