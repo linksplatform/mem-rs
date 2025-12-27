@@ -19,3 +19,15 @@ thiserror = "1.0"
 paste = "1.0"
 quickcheck = "1.0"
 quickcheck_macros = "1.0"
+
+[[example]]
+name = "readme_example1"
+path = "experiments/readme_example1.rs"
+
+[[example]]
+name = "readme_example2"
+path = "experiments/readme_example2.rs"
+
+[[example]]
+name = "readme_example3"
+path = "experiments/readme_example3.rs"
