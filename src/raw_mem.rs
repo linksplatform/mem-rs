@@ -128,7 +128,7 @@ pub trait RawMem {
     }
 
     /// # Safety
-    /// [`Item`] must satisfy [initialization invariant][inv] for [`mem::zeroed`]
+    /// [`Item`] must satisfy [initialization invariant][inv] for [`std::mem::zeroed`]
     ///
     /// [`Item`]: Self::Item
     ///  [inv]: MaybeUninit#initialization-invariant
