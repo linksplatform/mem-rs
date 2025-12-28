@@ -1,5 +1,3 @@
-#![feature(allocator_api)]
-
 use platform_mem::{TempFile, RawMem};
 
 fn main() -> Result<(), platform_mem::Error> {

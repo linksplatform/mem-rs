@@ -1,5 +1,3 @@
-#![feature(allocator_api)]
-
 use platform_mem::{Global, RawMem};
 
 fn main() -> Result<(), platform_mem::Error> {

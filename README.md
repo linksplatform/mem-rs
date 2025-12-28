@@ -32,19 +32,13 @@ Add to your `Cargo.toml`:
 platform-mem = "0.1"
 ```
 
-**Note:** This crate requires nightly Rust for the `allocator_api` feature.
-
-```bash
-rustup override set nightly
-```
+**Note:** This crate works on stable Rust. It uses the [`allocator-api2`](https://crates.io/crates/allocator-api2) crate to provide allocator API functionality on stable Rust.
 
 ## Usage
 
 ### Basic Example with Global Allocator
 
 ```rust,ignore
-#![feature(allocator_api)]
-
 use platform_mem::{Global, RawMem};
 
 fn main() -> Result<(), platform_mem::Error> {
@@ -69,8 +63,6 @@ fn main() -> Result<(), platform_mem::Error> {
 ### Memory-Mapped File Storage
 
 ```rust,ignore
-#![feature(allocator_api)]
-
 use platform_mem::{FileMapped, RawMem};
 
 fn main() -> Result<(), platform_mem::Error> {
@@ -92,8 +84,6 @@ fn main() -> Result<(), platform_mem::Error> {
 ### Temporary File Storage
 
 ```rust,ignore
-#![feature(allocator_api)]
-
 use platform_mem::{TempFile, RawMem};
 
 fn main() -> Result<(), platform_mem::Error> {
@@ -110,8 +100,6 @@ fn main() -> Result<(), platform_mem::Error> {
 ### Generic Code with `RawMem`
 
 ```rust,ignore
-#![feature(allocator_api)]
-
 use platform_mem::RawMem;
 
 fn process_data<M: RawMem<Item = u32>>(mem: &mut M) -> Result<(), platform_mem::Error> {
@@ -128,8 +116,6 @@ fn process_data<M: RawMem<Item = u32>>(mem: &mut M) -> Result<(), platform_mem::
 ### Type-Erased Memory with `ErasedMem`
 
 ```rust,ignore
-#![feature(allocator_api)]
-
 use platform_mem::{ErasedMem, Global, RawMem};
 
 fn main() {

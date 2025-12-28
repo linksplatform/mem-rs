@@ -59,9 +59,10 @@ impl<T> RawPlace<T> {
         // it forbid growing, but allow `RawPlace::<ZST>::dangling` and thus `Alloc::<ZST>::new`'s
         const { assert!(mem::size_of::<T>() != 0) };
 
-        let uninit = NonNull::slice_from_raw_parts(ptr, cap)
-            .get_unchecked_mut(self.cap..)
-            .as_uninit_slice_mut();
+        // Manually compute the pointer to the uninitialized part (stable alternative to slice_ptr_get + ptr_as_uninit)
+        let uninit_ptr = ptr.as_ptr().add(self.cap);
+        let uninit_len = cap - self.cap;
+        let uninit = slice::from_raw_parts_mut(uninit_ptr as *mut MaybeUninit<T>, uninit_len);
 
         self.ptr = ptr;
         self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
@@ -73,7 +74,7 @@ impl<T> RawPlace<T> {
 
         self.len = cap; // `len` is same `cap` only if `uninit` was init
 
-        MaybeUninit::slice_assume_init_mut(uninit)
+        crate::raw_mem::uninit::assume_init_mut(uninit)
     }
 
     pub fn shrink_to(&mut self, cap: usize) {

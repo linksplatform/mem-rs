@@ -1,11 +1,12 @@
 use {
+    allocator_api2::alloc::Allocator,
     crate::{
         utils,
         Error::{AllocError, CapacityOverflow},
         RawMem, RawPlace, Result,
     },
     std::{
-        alloc::{Allocator, Layout},
+        alloc::Layout,
         fmt::{self, Debug, Formatter},
         mem::{self, MaybeUninit},
         ptr,
