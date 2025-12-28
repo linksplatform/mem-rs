@@ -13,13 +13,13 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 2. **Install Rust**
 
-   This project requires a specific nightly Rust version. Install Rust using rustup:
+   This project works on stable Rust. Install Rust using rustup:
 
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
-   The toolchain will be automatically installed when you build the project (configured in `rust-toolchain.toml`).
+   The stable toolchain will be automatically used when you build the project (configured in `rust-toolchain.toml`).
 
 3. **Build the project**
 
@@ -102,7 +102,7 @@ Thank you for your interest in contributing! This document provides guidelines a
 
 This project uses:
 
-- **Nightly Rust features** for memory management
+- **Stable Rust** with the `allocator-api2` crate for allocator API functionality
 - **cargo test** for testing
 
 ### Code Standards

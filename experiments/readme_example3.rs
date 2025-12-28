@@ -1,5 +1,3 @@
-#![feature(allocator_api)]
-
 use platform_mem::RawMem;
 
 fn process_data<M: RawMem<Item = u32>>(mem: &mut M) -> Result<(), platform_mem::Error> {

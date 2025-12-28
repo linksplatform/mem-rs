@@ -1,11 +1,3 @@
-#![feature(
-    allocator_api,
-    slice_ptr_get,
-    ptr_as_uninit,
-    slice_range,
-    unboxed_closures,
-    fn_traits
-)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
@@ -29,7 +21,7 @@ fn _assertion() {
     fn assert_sync_send<T: Sync + Send>() {}
 
     assert_sync_send::<FileMapped<()>>();
-    assert_sync_send::<Alloc<(), std::alloc::Global>>();
+    assert_sync_send::<Alloc<(), allocator_api2::alloc::Global>>();
 }
 
 macro_rules! delegate_memory {
@@ -84,8 +76,9 @@ macro_rules! delegate_memory {
     )*};
 }
 
+use allocator_api2::alloc::{Global as GlobalAlloc};
 use std::{
-    alloc::{Global as GlobalAlloc, System as SystemAlloc},
+    alloc::System as SystemAlloc,
     fs::File,
     io,
     path::Path,

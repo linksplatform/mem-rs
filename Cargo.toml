@@ -11,6 +11,7 @@ Memory for linksplatform
 """
 
 [dependencies]
+allocator-api2 = "0.2"
 memmap2 = "0.9"
 tempfile = "3"
 thiserror = "2"

@@ -1,12 +1,22 @@
 //! Comprehensive tests for 100% code coverage
 
-#![feature(allocator_api)]
-#![feature(assert_matches)]
-
+use allocator_api2::alloc::Global as GlobalAlloc;
 use platform_mem::{Alloc, ErasedMem, Error, FileMapped, Global, RawMem, Result, System, TempFile};
-use std::alloc::Global as GlobalAlloc;
-use std::assert_matches::assert_matches;
 use std::io;
+
+/// Helper macro to check if a result matches a pattern (stable alternative to assert_matches)
+macro_rules! assert_matches {
+    ($expr:expr, $pattern:pat) => {
+        match $expr {
+            $pattern => {}
+            ref e => panic!(
+                "assertion failed: `{:?}` does not match `{}`",
+                e,
+                stringify!($pattern)
+            ),
+        }
+    };
+}
 
 // ============================================================================
 // Alloc tests

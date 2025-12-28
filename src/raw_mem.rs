@@ -1,9 +1,25 @@
 use std::{
     alloc::Layout,
     mem::MaybeUninit,
-    ops::{Range, RangeBounds},
-    slice,
+    ops::{Bound, Range, RangeBounds},
 };
+
+/// Converts a `RangeBounds` to a `Range` with bounds checking (stable alternative to `slice::range`)
+fn range_bounds_to_range<R: RangeBounds<usize>>(range: R, len: usize) -> Range<usize> {
+    let start = match range.start_bound() {
+        Bound::Included(&n) => n,
+        Bound::Excluded(&n) => n.checked_add(1).expect("range start overflow"),
+        Bound::Unbounded => 0,
+    };
+    let end = match range.end_bound() {
+        Bound::Included(&n) => n.checked_add(1).expect("range end overflow"),
+        Bound::Excluded(&n) => n,
+        Bound::Unbounded => len,
+    };
+    assert!(start <= end, "range start ({start}) > end ({end})");
+    assert!(end <= len, "range end ({end}) > length ({len})");
+    start..end
+}
 
 /// Error memory allocation
 // fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
@@ -18,13 +34,10 @@ pub enum Error {
     /// grow more than `isize::MAX` bytes:
     ///
     /// ```
-    /// # #![feature(allocator_api)]
-    /// # #![feature(assert_matches)]
-    /// # use std::alloc::Global;
-    /// # use std::assert_matches::assert_matches;
+    /// # use allocator_api2::alloc::Global;
     /// # use platform_mem::{Error, Alloc, RawMem};
     /// let mut mem = Alloc::new(Global);
-    /// assert_matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow));
+    /// assert!(matches!(mem.grow_filled(usize::MAX, 0u64), Err(Error::CapacityOverflow)));
     /// ```
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
@@ -62,8 +75,7 @@ pub trait RawMem {
     ///
     /// ### Incorrect usage
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    /// # use std::alloc::Global;
+    /// # use allocator_api2::alloc::Global;
     /// # use std::mem::MaybeUninit;
     /// # use platform_mem::Result;
     /// use platform_mem::{Alloc, RawMem};
@@ -136,7 +148,6 @@ pub trait RawMem {
     /// # Examples
     /// Correct usage of this function: initializing an integral-like types with zeroes:
     /// ```
-    /// # #![feature(allocator_api)]
     /// # use platform_mem::Error;
     /// use platform_mem::{Global, RawMem};
     ///
@@ -151,8 +162,7 @@ pub trait RawMem {
     ///
     /// Incorrect usage of this function: initializing a reference with zero:
     /// ```no_run
-    /// # #![feature(allocator_api)]
-    ///  # use platform_mem::Error;
+    /// # use platform_mem::Error;
     /// use platform_mem::{Global, RawMem};
     ///
     /// let mut alloc = Global::new();
@@ -229,10 +239,10 @@ pub trait RawMem {
     where
         Self::Item: Clone,
     {
-        let Range { start, end } = slice::range(range, ..self.allocated().len());
+        let Range { start, end } = range_bounds_to_range(range, self.allocated().len());
         unsafe {
             self.grow(end - start, |_, (within, uninit)| {
-                uninit.write_clone_of_slice(&within[start..end]);
+                uninit::write_clone_of_slice(uninit, &within[start..end]);
             })
         }
     }
@@ -243,31 +253,47 @@ pub trait RawMem {
     {
         unsafe {
             self.grow(src.len(), |_, (_, uninit)| {
-                uninit.write_clone_of_slice(src);
+                uninit::write_clone_of_slice(uninit, src);
             })
         }
     }
 }
 
-struct Unique<T>(MaybeUninit<T>);
+/// A callable trait for fill functions, usable as a trait object.
+/// This is a stable alternative to implementing `FnMut` manually.
+pub trait FillFn<T> {
+    fn call(&mut self, inited: usize, slices: (&mut [T], &mut [MaybeUninit<T>]));
+}
 
-impl<T> Unique<T> {
-    pub unsafe fn assume(unique: T) -> Self {
-        Self(MaybeUninit::new(unique))
+/// Implements `FillFn` for any `FnMut` closure.
+impl<T, F> FillFn<T> for F
+where
+    F: FnMut(usize, (&mut [T], &mut [MaybeUninit<T>])),
+{
+    fn call(&mut self, inited: usize, slices: (&mut [T], &mut [MaybeUninit<T>])) {
+        self(inited, slices)
     }
 }
 
-impl<A, B, F: FnOnce(A, B)> FnOnce<(A, B)> for Unique<F> {
-    type Output = ();
+/// A wrapper that allows calling a `FnOnce` through the `FillFn` interface.
+/// Used to pass `FnOnce` closures to erased trait objects that expect `FillFn`.
+struct CallOnce<F> {
+    inner: Option<F>,
+}
 
-    extern "rust-call" fn call_once(self, args: (A, B)) -> Self::Output {
-        unsafe { self.0.assume_init().call_once(args) }
+impl<F> CallOnce<F> {
+    fn new(f: F) -> Self {
+        Self { inner: Some(f) }
     }
 }
 
-impl<A, B, F: FnOnce(A, B)> FnMut<(A, B)> for Unique<F> {
-    extern "rust-call" fn call_mut(&mut self, args: (A, B)) -> Self::Output {
-        unsafe { self.0.assume_init_read().call_once(args) }
+impl<T, F> FillFn<T> for CallOnce<F>
+where
+    F: FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
+{
+    fn call(&mut self, inited: usize, slices: (&mut [T], &mut [MaybeUninit<T>])) {
+        let f = self.inner.take().expect("CallOnce::call called more than once");
+        f(inited, slices);
     }
 }
 
@@ -280,7 +306,7 @@ pub unsafe trait ErasedMem {
     unsafe fn erased_grow(
         &mut self,
         cap: usize,
-        fill: &mut dyn FnMut(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+        fill: &mut dyn FillFn<Self::Item>,
     ) -> Result<&mut [Self::Item]>;
 
     fn erased_shrink(&mut self, cap: usize) -> Result<()>;
@@ -308,7 +334,7 @@ macro_rules! impl_erased {
                 cap: usize,
                 fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
             ) -> Result<&mut [Self::Item]> {
-                (**self).erased_grow(cap, unsafe { &mut Unique::assume(fill) })
+                (**self).erased_grow(cap, &mut CallOnce::new(fill))
             }
 
             fn shrink(&mut self, cap: usize) -> Result<()> {
@@ -342,9 +368,9 @@ unsafe impl<All: RawMem + ?Sized> ErasedMem for All {
     unsafe fn erased_grow(
         &mut self,
         cap: usize,
-        fill: &mut dyn FnMut(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
+        fill: &mut dyn FillFn<Self::Item>,
     ) -> Result<&mut [Self::Item]> {
-        self.grow(cap, fill)
+        self.grow(cap, |inited, slices| fill.call(inited, slices))
     }
 
     fn erased_shrink(&mut self, cap: usize) -> Result<()> {
@@ -357,7 +383,30 @@ unsafe impl<All: RawMem + ?Sized> ErasedMem for All {
 }
 
 pub mod uninit {
-    use std::{mem, mem::MaybeUninit, ptr};
+    use std::{mem, mem::MaybeUninit, ptr, slice};
+
+    /// Stable alternative to `MaybeUninit::slice_assume_init_mut`.
+    ///
+    /// # Safety
+    /// All elements of `s` must be initialized.
+    #[inline]
+    pub unsafe fn assume_init_mut<T>(s: &mut [MaybeUninit<T>]) -> &mut [T] {
+        // SAFETY: The caller guarantees all elements are initialized.
+        // MaybeUninit<T> has the same layout as T.
+        unsafe { slice::from_raw_parts_mut(s.as_mut_ptr().cast::<T>(), s.len()) }
+    }
+
+    /// Stable alternative to `MaybeUninit::write_slice_cloned` / `write_clone_of_slice`.
+    ///
+    /// # Panics
+    /// Panics if `uninit.len() != src.len()`.
+    pub fn write_clone_of_slice<T: Clone>(uninit: &mut [MaybeUninit<T>], src: &[T]) {
+        assert_eq!(uninit.len(), src.len(), "slice lengths must match");
+
+        for (dst, val) in uninit.iter_mut().zip(src.iter()) {
+            dst.write(val.clone());
+        }
+    }
 
     pub fn fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
         let mut guard = Guard { slice: uninit, init: 0 };
@@ -396,9 +445,8 @@ pub mod uninit {
             // SAFETY: this raw slice will contain only initialized objects
             // that's why, it is allowed to drop it.
             unsafe {
-                ptr::drop_in_place(
-                    self.slice.get_unchecked_mut(..self.init).assume_init_mut(),
-                );
+                let inited_slice = self.slice.get_unchecked_mut(..self.init);
+                ptr::drop_in_place(assume_init_mut(inited_slice));
             }
         }
     }
