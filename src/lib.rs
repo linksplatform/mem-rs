@@ -1,16 +1,10 @@
 #![feature(
     allocator_api,
-    unchecked_math,
-    maybe_uninit_slice,
     slice_ptr_get,
     ptr_as_uninit,
-    inline_const,
     slice_range,
-    maybe_uninit_write_slice,
     unboxed_closures,
-    fn_traits,
-    let_else,
-    nonnull_slice_from_raw_parts
+    fn_traits
 )]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
