@@ -14,8 +14,6 @@ Memory for linksplatform
 default = []
 # Enable async memory operations using tokio
 async = ["tokio"]
-# Enable io_uring backend for async operations on Linux (more efficient)
-io-uring = ["async", "tokio-uring"]
 
 [dependencies]
 allocator-api2 = "0.2"
@@ -25,7 +23,6 @@ thiserror = "2"
 
 # Optional async dependencies
 tokio = { version = "1", features = ["fs", "io-util", "rt"], optional = true }
-tokio-uring = { version = "0.5", optional = true }
 
 [dev-dependencies]
 paste = "1"
