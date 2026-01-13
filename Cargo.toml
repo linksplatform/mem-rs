@@ -10,16 +10,26 @@ description = """
 Memory for linksplatform
 """
 
+[features]
+default = []
+# Enable async memory operations using tokio
+async = ["tokio"]
+
 [dependencies]
 allocator-api2 = "0.2"
 memmap2 = "0.9"
 tempfile = "3"
 thiserror = "2"
 
+# Optional async dependencies
+tokio = { version = "1", features = ["fs", "io-util", "rt"], optional = true }
+
 [dev-dependencies]
 paste = "1"
 quickcheck = "1"
 quickcheck_macros = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [[example]]
 name = "readme_example1"
@@ -32,3 +42,12 @@ path = "experiments/readme_example2.rs"
 [[example]]
 name = "readme_example3"
 path = "experiments/readme_example3.rs"
+
+[[example]]
+name = "async_example"
+path = "experiments/async_example.rs"
+required-features = ["async"]
+
+[[bench]]
+name = "memory_benchmarks"
+harness = false

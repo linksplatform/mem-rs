@@ -22,6 +22,7 @@ This allows writing generic code that works with any memory backend, making it e
 - **Temporary file storage** - anonymous file-backed memory that's cleaned up on drop
 - **Safe growth operations** - `grow_filled`, `grow_zeroed`, `grow_from_slice`, and more
 - **Thread-safe** - all memory types implement `Send + Sync`
+- **Async memory operations** (optional) - async file I/O with `AsyncFileMem` via tokio
 
 ## Installation
 
@@ -33,6 +34,15 @@ platform-mem = "0.1"
 ```
 
 **Note:** This crate works on stable Rust. It uses the [`allocator-api2`](https://crates.io/crates/allocator-api2) crate to provide allocator API functionality on stable Rust.
+
+### Optional Features
+
+To enable async memory operations:
+
+```toml
+[dependencies]
+platform-mem = { version = "0.1", features = ["async"] }
+```
 
 ## Usage
 
@@ -125,6 +135,30 @@ fn main() {
 }
 ```
 
+### Async File Memory (requires `async` feature)
+
+```rust,ignore
+use platform_mem::AsyncFileMem;
+
+#[tokio::main]
+async fn main() -> std::io::Result<()> {
+    // Create async file-backed memory
+    let mut mem = AsyncFileMem::<u64>::create("async_data.bin").await?;
+
+    // Async grow operations
+    mem.grow_filled(100, 42).await.unwrap();
+
+    // Direct memory access (in-memory buffer)
+    mem.set(0, 123);
+    assert_eq!(mem.get(0), Some(123));
+
+    // Persist changes to disk asynchronously
+    mem.sync().await?;
+
+    Ok(())
+}
+```
+
 ## API Overview
 
 ### `RawMem` Trait
@@ -151,6 +185,7 @@ The core trait providing memory operations:
 | `Alloc<T, A>` | Generic over any `Allocator` |
 | `FileMapped<T>` | Memory-mapped file storage |
 | `TempFile<T>` | Temporary file-backed memory |
+| `AsyncFileMem<T>` | Async file-backed memory (requires `async` feature) |
 
 ## Error Handling
 
