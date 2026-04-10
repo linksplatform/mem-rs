@@ -22,7 +22,7 @@ This allows writing generic code that works with any memory backend, making it e
 - **Temporary file storage** - anonymous file-backed memory that's cleaned up on drop
 - **Safe growth operations** - `grow_filled`, `grow_zeroed`, `grow_from_slice`, and more
 - **Thread-safe** - all memory types implement `Send + Sync`
-- **Async memory operations** (optional) - async file I/O with `AsyncFileMem` via tokio
+- **Async memory operations** (optional) - async mmap access with `AsyncFileMem` via dedicated I/O thread
 
 ## Installation
 
@@ -141,20 +141,19 @@ fn main() {
 use platform_mem::AsyncFileMem;
 
 #[tokio::main]
-async fn main() -> std::io::Result<()> {
-    // Create async file-backed memory
-    let mut mem = AsyncFileMem::<u64>::create("async_data.bin").await?;
+async fn main() -> Result<(), platform_mem::Error> {
+    // Create async mmap-backed memory with a dedicated I/O thread.
+    // Page faults are handled by the I/O thread, not the async runtime.
+    let mem = AsyncFileMem::<u64>::from_path("async_data.bin")?;
 
-    // Async grow operations
-    mem.grow_filled(100, 42).await.unwrap();
+    // Async grow operations (dispatched to I/O thread)
+    mem.grow_filled(100, 42).await?;
 
-    // Direct memory access (in-memory buffer)
-    mem.set(0, 123);
-    assert_eq!(mem.get(0), Some(123));
+    // Read/write via I/O thread (non-blocking for async callers)
+    mem.set(0, 123).await?;
+    assert_eq!(mem.get(0).await?, Some(123));
 
-    // Persist changes to disk asynchronously
-    mem.sync().await?;
-
+    // Data is synced to disk when AsyncFileMem is dropped
     Ok(())
 }
 ```
@@ -185,7 +184,7 @@ The core trait providing memory operations:
 | `Alloc<T, A>` | Generic over any `Allocator` |
 | `FileMapped<T>` | Memory-mapped file storage |
 | `TempFile<T>` | Temporary file-backed memory |
-| `AsyncFileMem<T>` | Async file-backed memory (requires `async` feature) |
+| `AsyncFileMem<T>` | Async mmap access via dedicated I/O thread (requires `async` feature) |
 
 ## Error Handling
 

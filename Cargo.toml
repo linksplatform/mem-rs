@@ -22,7 +22,7 @@ tempfile = "3"
 thiserror = "2"
 
 # Optional async dependencies
-tokio = { version = "1", features = ["fs", "io-util", "rt"], optional = true }
+tokio = { version = "1", features = ["sync"], optional = true }
 
 [dev-dependencies]
 paste = "1"
