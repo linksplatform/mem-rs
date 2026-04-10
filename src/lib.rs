@@ -44,17 +44,32 @@ macro_rules! delegate_memory {
             use std::{
                 mem::MaybeUninit,
                 fmt::{self, Formatter},
+                ops::{Deref, DerefMut},
             };
+
+            impl<$param> Deref for $me<$param> {
+                type Target = [$param];
+
+                fn deref(&self) -> &Self::Target {
+                    &*self.0
+                }
+            }
+
+            impl<$param> DerefMut for $me<$param> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut *self.0
+                }
+            }
 
             impl<$param> RawMem for $me<$param> {
                 type Item = $param;
 
-                fn allocated(&self) -> &[Self::Item] {
-                    self.0.allocated()
+                fn allocated(&self) -> &[$param] {
+                    self
                 }
 
-                fn allocated_mut(&mut self) -> &mut [Self::Item] {
-                    self.0.allocated_mut()
+                fn allocated_mut(&mut self) -> &mut [$param] {
+                    self
                 }
 
                 unsafe fn grow(

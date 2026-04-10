@@ -9,6 +9,7 @@ use {
         alloc::Layout,
         fmt::{self, Debug, Formatter},
         mem::{self, MaybeUninit},
+        ops::{Deref, DerefMut},
         ptr,
     },
 };
@@ -31,15 +32,29 @@ impl<T, A: Allocator> Alloc<T, A> {
     }
 }
 
+impl<T, A: Allocator> Deref for Alloc<T, A> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.buf.as_slice() }
+    }
+}
+
+impl<T, A: Allocator> DerefMut for Alloc<T, A> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.buf.as_slice_mut() }
+    }
+}
+
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
 
-    fn allocated(&self) -> &[Self::Item] {
-        unsafe { self.buf.as_slice() }
+    fn allocated(&self) -> &[T] {
+        self
     }
 
-    fn allocated_mut(&mut self) -> &mut [Self::Item] {
-        unsafe { self.buf.as_slice_mut() }
+    fn allocated_mut(&mut self) -> &mut [T] {
+        self
     }
 
     unsafe fn grow(
