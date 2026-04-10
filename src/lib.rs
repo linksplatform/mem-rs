@@ -10,12 +10,20 @@ pub mod raw_mem;
 mod raw_place;
 mod utils;
 
+// Async memory module (requires `async` feature)
+#[cfg(feature = "async")]
+pub mod async_mem;
+
 pub(crate) use raw_place::RawPlace;
 pub use {
     alloc::Alloc,
     file_mapped::FileMapped,
     raw_mem::{ErasedMem, Error, RawMem, Result},
 };
+
+// Re-export async types when feature is enabled
+#[cfg(feature = "async")]
+pub use async_mem::AsyncFileMem;
 
 fn _assertion() {
     fn assert_sync_send<T: Sync + Send>() {}
