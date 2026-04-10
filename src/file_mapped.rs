@@ -7,7 +7,6 @@ use {
         fs::File,
         io,
         mem::{self, MaybeUninit},
-        ops::{Deref, DerefMut},
         path::Path,
         ptr::{self, NonNull},
     },
@@ -44,7 +43,7 @@ impl<T> FileMapped<T> {
     }
 }
 
-impl<T> Deref for FileMapped<T> {
+impl<T> std::ops::Deref for FileMapped<T> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target {
@@ -52,7 +51,7 @@ impl<T> Deref for FileMapped<T> {
     }
 }
 
-impl<T> DerefMut for FileMapped<T> {
+impl<T> std::ops::DerefMut for FileMapped<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.buf.as_slice_mut() }
     }
@@ -61,11 +60,11 @@ impl<T> DerefMut for FileMapped<T> {
 impl<T> RawMem for FileMapped<T> {
     type Item = T;
 
-    fn allocated(&self) -> &[T] {
+    fn allocated(&self) -> &[Self::Item] {
         self
     }
 
-    fn allocated_mut(&mut self) -> &mut [T] {
+    fn allocated_mut(&mut self) -> &mut [Self::Item] {
         self
     }
 

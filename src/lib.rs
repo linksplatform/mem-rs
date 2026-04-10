@@ -64,12 +64,12 @@ macro_rules! delegate_memory {
             impl<$param> RawMem for $me<$param> {
                 type Item = $param;
 
-                fn allocated(&self) -> &[$param] {
-                    self
+                fn allocated(&self) -> &[Self::Item] {
+                    self.0.allocated()
                 }
 
-                fn allocated_mut(&mut self) -> &mut [$param] {
-                    self
+                fn allocated_mut(&mut self) -> &mut [Self::Item] {
+                    self.0.allocated_mut()
                 }
 
                 unsafe fn grow(
