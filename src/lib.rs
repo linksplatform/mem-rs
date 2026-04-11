@@ -1,15 +1,3 @@
-#![feature(
-    allocator_api,
-    unchecked_math,
-    maybe_uninit_slice,
-    slice_ptr_get,
-    ptr_as_uninit,
-    inline_const,
-    slice_range,
-    maybe_uninit_write_slice,
-    unboxed_closures,
-    fn_traits
-)]
 // special lint
 #![cfg_attr(not(test), forbid(clippy::unwrap_used))]
 // rust compiler lints
@@ -18,9 +6,13 @@
 
 mod alloc;
 mod file_mapped;
-mod raw_mem;
+pub mod raw_mem;
 mod raw_place;
 mod utils;
+
+// Async memory module (requires `async` feature)
+#[cfg(feature = "async")]
+pub mod async_mem;
 
 pub(crate) use raw_place::RawPlace;
 pub use {
@@ -29,11 +21,15 @@ pub use {
     raw_mem::{ErasedMem, Error, RawMem, Result},
 };
 
+// Re-export async types when feature is enabled
+#[cfg(feature = "async")]
+pub use async_mem::AsyncFileMem;
+
 fn _assertion() {
     fn assert_sync_send<T: Sync + Send>() {}
 
     assert_sync_send::<FileMapped<()>>();
-    assert_sync_send::<Alloc<(), std::alloc::Global>>();
+    assert_sync_send::<Alloc<(), allocator_api2::alloc::Global>>();
 }
 
 macro_rules! delegate_memory {
@@ -48,7 +44,22 @@ macro_rules! delegate_memory {
             use std::{
                 mem::MaybeUninit,
                 fmt::{self, Formatter},
+                ops::{Deref, DerefMut},
             };
+
+            impl<$param> Deref for $me<$param> {
+                type Target = [$param];
+
+                fn deref(&self) -> &Self::Target {
+                    &*self.0
+                }
+            }
+
+            impl<$param> DerefMut for $me<$param> {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut *self.0
+                }
+            }
 
             impl<$param> RawMem for $me<$param> {
                 type Item = $param;
@@ -88,8 +99,9 @@ macro_rules! delegate_memory {
     )*};
 }
 
+use allocator_api2::alloc::{Global as GlobalAlloc};
 use std::{
-    alloc::{Global as GlobalAlloc, System as SystemAlloc},
+    alloc::System as SystemAlloc,
     fs::File,
     io,
     path::Path,

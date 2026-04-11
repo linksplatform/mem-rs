@@ -1,11 +1,12 @@
 use {
+    allocator_api2::alloc::Allocator,
     crate::{
         utils,
         Error::{AllocError, CapacityOverflow},
         RawMem, RawPlace, Result,
     },
     std::{
-        alloc::{Allocator, Layout},
+        alloc::Layout,
         fmt::{self, Debug, Formatter},
         mem::{self, MaybeUninit},
         ptr,
@@ -30,15 +31,29 @@ impl<T, A: Allocator> Alloc<T, A> {
     }
 }
 
+impl<T, A: Allocator> std::ops::Deref for Alloc<T, A> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.buf.as_slice() }
+    }
+}
+
+impl<T, A: Allocator> std::ops::DerefMut for Alloc<T, A> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.buf.as_slice_mut() }
+    }
+}
+
 impl<T, A: Allocator> RawMem for Alloc<T, A> {
     type Item = T;
 
     fn allocated(&self) -> &[Self::Item] {
-        unsafe { self.buf.as_slice() }
+        self
     }
 
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
-        unsafe { self.buf.as_slice_mut() }
+        self
     }
 
     unsafe fn grow(

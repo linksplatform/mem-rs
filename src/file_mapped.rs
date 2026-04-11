@@ -43,15 +43,29 @@ impl<T> FileMapped<T> {
     }
 }
 
+impl<T> std::ops::Deref for FileMapped<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.buf.as_slice() }
+    }
+}
+
+impl<T> std::ops::DerefMut for FileMapped<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.buf.as_slice_mut() }
+    }
+}
+
 impl<T> RawMem for FileMapped<T> {
     type Item = T;
 
     fn allocated(&self) -> &[Self::Item] {
-        unsafe { self.buf.as_slice() }
+        self
     }
 
     fn allocated_mut(&mut self) -> &mut [Self::Item] {
-        unsafe { self.buf.as_slice_mut() }
+        self
     }
 
     unsafe fn grow(
