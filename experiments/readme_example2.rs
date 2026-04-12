@@ -1,4 +1,4 @@
-use platform_mem::{TempFile, RawMem};
+use platform_mem::{RawMem, TempFile};
 
 fn main() -> Result<(), platform_mem::Error> {
     // Anonymous temporary file - cleaned up on drop

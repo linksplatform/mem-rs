@@ -127,16 +127,18 @@ pub trait RawMem {
     /// [`grow`]: Self::grow
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |inited, (_, uninit)| {
-            // fixme: maybe change it to `assert_eq!`
-            debug_assert_eq!(
-                inited,
-                uninit.len(),
-                "grown memory must be initialized, \
+        unsafe {
+            self.grow(cap, |inited, (_, uninit)| {
+                // fixme: maybe change it to `assert_eq!`
+                debug_assert_eq!(
+                    inited,
+                    uninit.len(),
+                    "grown memory must be initialized, \
                  usually allocators-like provide uninitialized memory, \
                  which is only safe for writing"
-            )
-        })
+                )
+            })
+        }
     }
 
     /// # Safety
@@ -174,15 +176,21 @@ pub trait RawMem {
     /// ```
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |_, (_, uninit)| {
-            uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
-        })
+        unsafe {
+            self.grow(cap, |_, (_, uninit)| {
+                uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
+            })
+        }
     }
 
+    /// # Safety
+    /// [`Item`](Self::Item) must satisfy the [initialization invariant](MaybeUninit#initialization-invariant) for zeroed memory.
     unsafe fn grow_zeroed_exact(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |inited, (_, uninit)| {
-            uninit.get_unchecked_mut(inited..).as_mut_ptr().write_bytes(0u8, uninit.len());
-        })
+        unsafe {
+            self.grow(cap, |inited, (_, uninit)| {
+                uninit.get_unchecked_mut(inited..).as_mut_ptr().write_bytes(0u8, uninit.len());
+            })
+        }
     }
 
     fn grow_with(
@@ -197,6 +205,8 @@ pub trait RawMem {
         }
     }
 
+    /// # Safety
+    /// The caller must ensure that `addition` accounts for already-initialized elements in the underlying buffer.
     unsafe fn grow_with_exact(
         &mut self,
         addition: usize,
@@ -220,6 +230,8 @@ pub trait RawMem {
         }
     }
 
+    /// # Safety
+    /// The caller must ensure that `cap` accounts for already-initialized elements in the underlying buffer.
     unsafe fn grow_filled_exact(
         &mut self,
         cap: usize,
@@ -297,12 +309,16 @@ where
     }
 }
 
+/// # Safety
+/// Implementors must uphold the same memory-safety invariants as [`RawMem`].
 pub unsafe trait ErasedMem {
     type Item;
 
     fn erased_allocated(&self) -> &[Self::Item];
     fn erased_allocated_mut(&mut self) -> &mut [Self::Item];
 
+    /// # Safety
+    /// The caller must guarantee that `fill` fully initializes the uninitialized portion.
     unsafe fn erased_grow(
         &mut self,
         cap: usize,
@@ -333,9 +349,9 @@ macro_rules! impl_erased {
                 &mut self,
                 cap: usize,
                 fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
-            ) -> Result<&mut [Self::Item]> {
+            ) -> Result<&mut [Self::Item]> { unsafe {
                 (**self).erased_grow(cap, &mut CallOnce::new(fill))
-            }
+            }}
 
             fn shrink(&mut self, cap: usize) -> Result<()> {
                 (**self).erased_shrink(cap)
@@ -370,7 +386,7 @@ unsafe impl<All: RawMem + ?Sized> ErasedMem for All {
         cap: usize,
         fill: &mut dyn FillFn<Self::Item>,
     ) -> Result<&mut [Self::Item]> {
-        self.grow(cap, |inited, slices| fill.call(inited, slices))
+        unsafe { self.grow(cap, |inited, slices| fill.call(inited, slices)) }
     }
 
     fn erased_shrink(&mut self, cap: usize) -> Result<()> {

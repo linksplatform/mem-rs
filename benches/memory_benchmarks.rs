@@ -3,7 +3,7 @@
 //! Run with: `cargo bench`
 //! Or for async benchmarks: `cargo bench --features async`
 
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
 use platform_mem::{FileMapped, Global, RawMem};
 
 /// Benchmark sync memory allocation and growth using Global allocator
@@ -176,45 +176,37 @@ mod async_benches {
 
         for size in [1_000, 10_000].iter() {
             // Sync FileMapped (direct mmap)
-            group.bench_with_input(
-                BenchmarkId::new("sync_filemapped", size),
-                size,
-                |b, &size| {
-                    b.iter(|| {
-                        let dir = tempfile::tempdir().unwrap();
-                        let path = dir.path().join("sync.bin");
-                        let mut mem = FileMapped::<u64>::from_path(&path).unwrap();
-                        unsafe {
-                            mem.grow_zeroed(size).unwrap();
-                        }
-                        for (i, slot) in mem.allocated_mut().iter_mut().enumerate() {
-                            *slot = i as u64;
-                        }
-                        // FileMapped syncs on drop
-                        black_box(mem.allocated().len())
-                    });
-                },
-            );
+            group.bench_with_input(BenchmarkId::new("sync_filemapped", size), size, |b, &size| {
+                b.iter(|| {
+                    let dir = tempfile::tempdir().unwrap();
+                    let path = dir.path().join("sync.bin");
+                    let mut mem = FileMapped::<u64>::from_path(&path).unwrap();
+                    unsafe {
+                        mem.grow_zeroed(size).unwrap();
+                    }
+                    for (i, slot) in mem.allocated_mut().iter_mut().enumerate() {
+                        *slot = i as u64;
+                    }
+                    // FileMapped syncs on drop
+                    black_box(mem.allocated().len())
+                });
+            });
 
             // Async file memory (mmap via I/O thread)
-            group.bench_with_input(
-                BenchmarkId::new("async_filemem", size),
-                size,
-                |b, &size| {
-                    b.iter(|| {
-                        rt.block_on(async {
-                            let mem = AsyncFileMem::<u64>::temp().unwrap();
-                            unsafe {
-                                mem.grow_zeroed(size).await.unwrap();
-                            }
-                            for i in 0..size {
-                                mem.set(i, i as u64).await.unwrap();
-                            }
-                            black_box(mem.len().await.unwrap())
-                        })
-                    });
-                },
-            );
+            group.bench_with_input(BenchmarkId::new("async_filemem", size), size, |b, &size| {
+                b.iter(|| {
+                    rt.block_on(async {
+                        let mem = AsyncFileMem::<u64>::temp().unwrap();
+                        unsafe {
+                            mem.grow_zeroed(size).await.unwrap();
+                        }
+                        for i in 0..size {
+                            mem.set(i, i as u64).await.unwrap();
+                        }
+                        black_box(mem.len().await.unwrap())
+                    })
+                });
+            });
         }
 
         group.finish();

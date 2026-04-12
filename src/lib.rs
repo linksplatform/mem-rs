@@ -61,9 +61,9 @@ macro_rules! delegate_memory {
                     &mut self,
                     addition: usize,
                     fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
-                ) -> Result<&mut [Self::Item]> {
+                ) -> Result<&mut [Self::Item]> { unsafe {
                     self.0.grow(addition, fill)
-                }
+                }}
 
                 fn shrink(&mut self, cap: usize) -> Result<()> {
                     self.0.shrink(cap)
@@ -84,13 +84,8 @@ macro_rules! delegate_memory {
     )*};
 }
 
-use allocator_api2::alloc::{Global as GlobalAlloc};
-use std::{
-    alloc::System as SystemAlloc,
-    fs::File,
-    io,
-    path::Path,
-};
+use allocator_api2::alloc::Global as GlobalAlloc;
+use std::{alloc::System as SystemAlloc, fs::File, io, path::Path};
 
 delegate_memory! {
     Global<T>(Alloc<T, GlobalAlloc>) {
