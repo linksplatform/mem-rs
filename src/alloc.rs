@@ -12,6 +12,10 @@ use {
     },
 };
 
+/// Allocator-backed memory storage.
+///
+/// Wraps any [`Allocator`] to provide a [`RawMem`] implementation.
+/// Memory is freed and elements are dropped when the `Alloc` is dropped.
 pub struct Alloc<T, A: Allocator> {
     buf: RawPlace<T>,
     alloc: A,

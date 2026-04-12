@@ -12,6 +12,14 @@ use {
     },
 };
 
+/// Memory-mapped file storage.
+///
+/// Elements are stored directly in a memory-mapped region backed by a file.
+/// The file is resized and remapped on each [`grow`](RawMem::grow) or
+/// [`shrink`](RawMem::shrink) call. Data is synced to disk on drop.
+///
+/// The file is guaranteed to be at least 4 KiB (one page) to satisfy
+/// OS-level mmap requirements.
 pub struct FileMapped<T> {
     buf: RawPlace<T>,
     mmap: Option<MmapMut>,
@@ -19,7 +27,9 @@ pub struct FileMapped<T> {
 }
 
 impl<T> FileMapped<T> {
-    // todo: say about mapping, read-write guarantees, and `MIN_PAGE_SIZE`
+    /// Creates a `FileMapped` from an already-opened file.
+    ///
+    /// If the file is smaller than one page (4 KiB), it is extended.
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 
@@ -30,6 +40,7 @@ impl<T> FileMapped<T> {
         Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
     }
 
+    /// Opens (or creates) a file at `path` and wraps it in a `FileMapped`.
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         File::options()
             .create(true)

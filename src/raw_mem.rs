@@ -21,8 +21,7 @@ fn range_bounds_to_range<R: RangeBounds<usize>>(range: R, len: usize) -> Range<u
     start..end
 }
 
-/// Error memory allocation
-// fixme: maybe we should add `(X bytes)` after `cannot allocate/occupy`
+/// Errors that can occur during memory operations.
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -42,8 +41,14 @@ pub enum Error {
     #[error("exceeding the capacity maximum")]
     CapacityOverflow,
 
+    /// Cannot grow because the requested size exceeds available capacity.
     #[error("can't grow {to_grow} elements, only available {available}")]
-    OverGrow { to_grow: usize, available: usize },
+    OverGrow {
+        /// Number of elements requested.
+        to_grow: usize,
+        /// Number of elements available.
+        available: usize,
+    },
 
     /// The memory allocator returned an error
     #[error("memory allocation of {layout:?} failed")]
@@ -55,23 +60,35 @@ pub enum Error {
         non_exhaustive: (),
     },
 
-    /// System error memory allocation occurred
+    /// An I/O or system-level error.
     #[error(transparent)]
     System(#[from] std::io::Error),
 }
 
-/// Alias for `Result<T, Error>` to return from `RawMem` methods
+/// Alias for `Result<T, Error>`.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Unified trait for growable, shrinkable memory regions.
+///
+/// Implementors manage a contiguous region of initialized `Item` elements.
+/// The region can be extended with [`grow`](Self::grow) variants and shortened
+/// with [`shrink`](Self::shrink).
 pub trait RawMem {
+    /// The element type stored in this memory.
     type Item;
 
+    /// Returns a shared slice of all currently initialized elements.
     fn allocated(&self) -> &[Self::Item];
+    /// Returns a mutable slice of all currently initialized elements.
     fn allocated_mut(&mut self) -> &mut [Self::Item];
 
+    /// Low-level growth: extends the memory by `cap` elements.
+    ///
+    /// The `fill` closure receives `(inited, (initialized_slice, uninitialized_slice))`
+    /// where `inited` is the count of elements already initialized by the backend.
+    ///
     /// # Safety
-    /// Caller must guarantee that `fill` makes the uninitialized part valid for
-    /// [`MaybeUninit::slice_assume_init_mut`]
+    /// Caller must guarantee that `fill` fully initializes the uninitialized portion.
     ///
     /// ### Incorrect usage
     /// ```no_run
@@ -95,8 +112,10 @@ pub trait RawMem {
         fill: impl FnOnce(usize, (&mut [Self::Item], &mut [MaybeUninit<Self::Item>])),
     ) -> Result<&mut [Self::Item]>;
 
+    /// Removes the last `cap` elements, dropping them.
     fn shrink(&mut self, cap: usize) -> Result<()>;
 
+    /// Returns an optional hint about the total capacity, if known.
     fn size_hint(&self) -> Option<usize> {
         None
     }
@@ -142,9 +161,9 @@ pub trait RawMem {
     }
 
     /// # Safety
-    /// [`Item`] must satisfy [initialization invariant][inv] for [`mem::zeroed`]
+    /// [`Item`](Self::Item) must satisfy the [initialization invariant][inv] for
+    /// [`core::mem::zeroed`].
     ///
-    /// [`Item`]: Self::Item
     ///  [inv]: MaybeUninit#initialization-invariant
     ///
     /// # Examples
@@ -193,6 +212,7 @@ pub trait RawMem {
         }
     }
 
+    /// Grows by `addition` elements, initializing each with the closure `f`.
     fn grow_with(
         &mut self,
         addition: usize,
@@ -219,6 +239,7 @@ pub trait RawMem {
         }
     }
 
+    /// Grows by `cap` elements, each cloned from `value`.
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -247,6 +268,7 @@ pub trait RawMem {
         }
     }
 
+    /// Grows by cloning a sub-range of the currently allocated data.
     fn grow_within<R: RangeBounds<usize>>(&mut self, range: R) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -259,6 +281,7 @@ pub trait RawMem {
         }
     }
 
+    /// Grows by cloning all elements from `src`.
     fn grow_from_slice(&mut self, src: &[Self::Item]) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
@@ -274,6 +297,7 @@ pub trait RawMem {
 /// A callable trait for fill functions, usable as a trait object.
 /// This is a stable alternative to implementing `FnMut` manually.
 pub trait FillFn<T> {
+    /// Invoke the fill function with the given initialized count and memory slices.
     fn call(&mut self, inited: usize, slices: (&mut [T], &mut [MaybeUninit<T>]));
 }
 
@@ -312,9 +336,12 @@ where
 /// # Safety
 /// Implementors must uphold the same memory-safety invariants as [`RawMem`].
 pub unsafe trait ErasedMem {
+    /// The element type.
     type Item;
 
+    /// Returns a shared slice of initialized elements (type-erased).
     fn erased_allocated(&self) -> &[Self::Item];
+    /// Returns a mutable slice of initialized elements (type-erased).
     fn erased_allocated_mut(&mut self) -> &mut [Self::Item];
 
     /// # Safety
@@ -325,8 +352,10 @@ pub unsafe trait ErasedMem {
         fill: &mut dyn FillFn<Self::Item>,
     ) -> Result<&mut [Self::Item]>;
 
+    /// Removes the last `cap` elements (type-erased).
     fn erased_shrink(&mut self, cap: usize) -> Result<()>;
 
+    /// Returns an optional capacity hint (type-erased).
     fn erased_size_hint(&self) -> Option<usize> {
         None
     }
@@ -398,6 +427,9 @@ unsafe impl<All: RawMem + ?Sized> ErasedMem for All {
     }
 }
 
+/// Utilities for initializing `MaybeUninit` slices.
+///
+/// These are stable alternatives to nightly-only `MaybeUninit` slice methods.
 pub mod uninit {
     use std::{mem, mem::MaybeUninit, ptr, slice};
 
@@ -424,6 +456,7 @@ pub mod uninit {
         }
     }
 
+    /// Initializes all elements of `uninit` by cloning `val`. Panic-safe.
     pub fn fill<T: Clone>(uninit: &mut [MaybeUninit<T>], val: T) {
         let mut guard = Guard { slice: uninit, init: 0 };
 
@@ -439,6 +472,7 @@ pub mod uninit {
         mem::forget(guard);
     }
 
+    /// Initializes all elements of `uninit` using the closure `fill`. Panic-safe.
     pub fn fill_with<T>(uninit: &mut [MaybeUninit<T>], mut fill: impl FnMut() -> T) {
         let mut guard = Guard { slice: uninit, init: 0 };
 
