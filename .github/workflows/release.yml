@@ -260,3 +260,34 @@ jobs:
           node scripts/create-github-release.mjs \
             --release-version "${{ steps.version.outputs.new_version }}" \
             --repository "${{ github.repository }}"
+
+  # Deploy documentation to GitHub Pages after a successful release
+  deploy-docs:
+    name: Deploy Rust Documentation
+    needs: [auto-release, manual-release]
+    if: |
+      always() && !cancelled() && (
+        needs.auto-release.result == 'success' ||
+        needs.manual-release.result == 'success'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build documentation
+        run: cargo doc --no-deps --all-features
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: target/doc
+          destination_dir: rust
+          keep_files: true
