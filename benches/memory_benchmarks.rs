@@ -3,8 +3,9 @@
 //! Run with: `cargo bench`
 //! Or for async benchmarks: `cargo bench --features async`
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use platform_mem::{FileMapped, Global, RawMem};
+use std::hint::black_box;
 
 /// Benchmark sync memory allocation and growth using Global allocator
 fn bench_sync_global_grow(c: &mut Criterion) {

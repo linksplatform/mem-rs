@@ -39,7 +39,7 @@ trait Terminate {
 }
 
 impl Terminate for () {
-    fn report(_: Self) {}
+    fn report((): Self) {}
 }
 
 impl<T, E: Debug> Terminate for Result<T, E> {
