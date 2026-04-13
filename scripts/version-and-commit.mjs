@@ -70,7 +70,7 @@ function setOutput(key, value) {
  */
 function getCurrentVersion() {
   const cargoToml = readFileSync('Cargo.toml', 'utf-8');
-  const match = cargoToml.match(/^version\s*=\s*"(\d+)\.(\d+)\.(\d+)"/m);
+  const match = cargoToml.match(/^version\s*=\s*"(\d+)\.(\d+)\.(\d+)(?:-[^"]*)?"/m);
 
   if (!match) {
     console.error('Error: Could not parse version from Cargo.toml');
