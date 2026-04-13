@@ -9,11 +9,9 @@ macro_rules! assert_matches {
     ($expr:expr, $pattern:pat) => {
         match $expr {
             $pattern => {}
-            ref e => panic!(
-                "assertion failed: `{:?}` does not match `{}`",
-                e,
-                stringify!($pattern)
-            ),
+            ref e => {
+                panic!("assertion failed: `{:?}` does not match `{}`", e, stringify!($pattern))
+            }
         }
     };
 }
@@ -667,8 +665,8 @@ mod thread_safety_tests {
 
 mod drop_tests {
     use super::*;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[test]
     fn drop_with_arc() {
@@ -764,5 +762,10 @@ mod edge_cases {
         let mut mem = Global::<u8>::new();
         mem.grow_filled(1_000_000, 0).unwrap();
         assert_eq!(mem.allocated().len(), 1_000_000);
+    }
+
+    #[test]
+    fn zst_global_can_be_created() {
+        let _: Global<()> = Global::new();
     }
 }

@@ -24,17 +24,17 @@ impl<T> RawPlace<T> {
     }
 
     pub unsafe fn as_slice(&self) -> &[T] {
-        slice::from_raw_parts(self.ptr.as_ptr(), self.len)
+        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
     }
 
     pub unsafe fn as_slice_mut(&mut self) -> &mut [T] {
-        slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len)
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
     }
 
     pub fn current_memory(&self) -> Option<(NonNull<u8>, Layout)> {
         // rust does not support such types,
         // so we can do better by skipping some checks and avoid an unwrap.
-        const { assert!(mem::size_of::<T>() % mem::align_of::<T>() == 0) };
+        const { assert!(mem::size_of::<T>().is_multiple_of(mem::align_of::<T>())) };
 
         if self.cap == 0 {
             None
@@ -55,26 +55,28 @@ impl<T> RawPlace<T> {
         inited: usize,
         fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
     ) -> &mut [T] {
-        // fixme: ZST correctness isn't checked now,
-        // it forbid growing, but allow `RawPlace::<ZST>::dangling` and thus `Alloc::<ZST>::new`'s
-        const { assert!(mem::size_of::<T>() != 0) };
+        unsafe {
+            // fixme: ZST correctness isn't checked now,
+            // it forbid growing, but allow `RawPlace::<ZST>::dangling` and thus `Alloc::<ZST>::new`'s
+            const { assert!(mem::size_of::<T>() != 0) };
 
-        // Manually compute the pointer to the uninitialized part (stable alternative to slice_ptr_get + ptr_as_uninit)
-        let uninit_ptr = ptr.as_ptr().add(self.cap);
-        let uninit_len = cap - self.cap;
-        let uninit = slice::from_raw_parts_mut(uninit_ptr as *mut MaybeUninit<T>, uninit_len);
+            // Manually compute the pointer to the uninitialized part (stable alternative to slice_ptr_get + ptr_as_uninit)
+            let uninit_ptr = ptr.as_ptr().add(self.cap);
+            let uninit_len = cap - self.cap;
+            let uninit = slice::from_raw_parts_mut(uninit_ptr as *mut MaybeUninit<T>, uninit_len);
 
-        self.ptr = ptr;
-        self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
-        //                 ( alloc memory )
+            self.ptr = ptr;
+            self.cap = cap; // `ptr` and `cap` changes after panicking `fill`
+            //                 ( alloc memory )
 
-        // slice from `as_slice_mut` will be the initialized part of owned memory
-        // while (&mut [T], &mut [MaybeUninit<T>]) will be the full memory
-        fill(inited, (self.as_slice_mut(), uninit)); // panic out!
+            // slice from `as_slice_mut` will be the initialized part of owned memory
+            // while (&mut [T], &mut [MaybeUninit<T>]) will be the full memory
+            fill(inited, (self.as_slice_mut(), uninit)); // panic out!
 
-        self.len = cap; // `len` is same `cap` only if `uninit` was init
+            self.len = cap; // `len` is same `cap` only if `uninit` was init
 
-        crate::raw_mem::uninit::assume_init_mut(uninit)
+            crate::raw_mem::uninit::assume_init_mut(uninit)
+        }
     }
 
     pub fn shrink_to(&mut self, cap: usize) {
@@ -108,8 +110,3 @@ impl<T> fmt::Debug for RawPlace<T> {
 
 unsafe impl<T: Sync> Sync for RawPlace<T> {}
 unsafe impl<T: Send> Send for RawPlace<T> {}
-
-#[test]
-fn zst_build() {
-    let _: RawPlace<()> = RawPlace::dangling();
-}

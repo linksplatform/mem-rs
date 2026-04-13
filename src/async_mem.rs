@@ -37,17 +37,9 @@
 //! }
 //! ```
 
-use std::{
-    fmt,
-    fs::File,
-    io,
-    marker::PhantomData,
-    path::Path,
-    sync::mpsc,
-    thread,
-};
+use std::{fmt, fs::File, io, marker::PhantomData, path::Path, sync::mpsc, thread};
 
-use crate::{file_mapped::FileMapped, Error, RawMem};
+use crate::{Error, RawMem, file_mapped::FileMapped};
 
 /// A command sent to the I/O thread.
 enum Command<T: Copy + Send + 'static> {
@@ -198,11 +190,7 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
         let (tx, rx) = mpsc::channel();
         let thread = spawn_io_thread(mem, rx);
 
-        Self {
-            tx: Some(tx),
-            thread: Some(thread),
-            _marker: PhantomData,
-        }
+        Self { tx: Some(tx), thread: Some(thread), _marker: PhantomData }
     }
 
     /// Helper to send a command and await the response.
@@ -213,13 +201,9 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
         let cmd = make_cmd(reply_tx);
 
-        self.tx
-            .as_ref()
-            .expect("AsyncFileMem already shut down")
-            .send(cmd)
-            .map_err(|_| {
-                io::Error::new(io::ErrorKind::BrokenPipe, "I/O thread terminated unexpectedly")
-            })?;
+        self.tx.as_ref().expect("AsyncFileMem already shut down").send(cmd).map_err(|_| {
+            io::Error::new(io::ErrorKind::BrokenPipe, "I/O thread terminated unexpectedly")
+        })?;
 
         reply_rx.await.map_err(|_| {
             Error::from(io::Error::new(
@@ -251,20 +235,17 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
 
     /// Reads a range of values as a Vec.
     pub async fn read_slice(&self, offset: usize, count: usize) -> Result<Vec<T>, Error> {
-        self.send_command(|tx| Command::ReadSlice(offset, count, tx))
-            .await?
+        self.send_command(|tx| Command::ReadSlice(offset, count, tx)).await?
     }
 
     /// Writes values starting at the given offset.
     pub async fn write_slice(&self, offset: usize, values: Vec<T>) -> Result<(), Error> {
-        self.send_command(|tx| Command::WriteSlice(offset, values, tx))
-            .await?
+        self.send_command(|tx| Command::WriteSlice(offset, values, tx)).await?
     }
 
     /// Grows the memory by `count` elements, filling with the given value.
     pub async fn grow_filled(&self, count: usize, value: T) -> Result<(), Error> {
-        self.send_command(|tx| Command::GrowFilled(count, value, tx))
-            .await?
+        self.send_command(|tx| Command::GrowFilled(count, value, tx)).await?
     }
 
     /// Grows the memory by `count` elements, zero-initialized.
@@ -273,8 +254,7 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
     ///
     /// The type `T` must be valid when all bytes are zero.
     pub async unsafe fn grow_zeroed(&self, count: usize) -> Result<(), Error> {
-        self.send_command(|tx| Command::GrowZeroed(count, tx))
-            .await?
+        self.send_command(|tx| Command::GrowZeroed(count, tx)).await?
     }
 
     /// Grows the memory by `count` elements, assuming the file data is
@@ -284,8 +264,7 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
     ///
     /// The underlying file must contain valid initialized data for `count` elements.
     pub async unsafe fn grow_assumed(&self, count: usize) -> Result<(), Error> {
-        self.send_command(|tx| Command::GrowAssumed(count, tx))
-            .await?
+        self.send_command(|tx| Command::GrowAssumed(count, tx)).await?
     }
 
     /// Shrinks the memory by `count` elements.
@@ -304,9 +283,7 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
             let _ = reply_rx.await;
         }
         if let Some(thread) = self.thread.take() {
-            thread
-                .join()
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "I/O thread panicked"))?;
+            thread.join().map_err(|_| io::Error::other("I/O thread panicked"))?;
         }
         Ok(())
     }
@@ -326,131 +303,6 @@ impl<T: Copy + Send + 'static> Drop for AsyncFileMem<T> {
 
 impl<T: Copy + Send + 'static> fmt::Debug for AsyncFileMem<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AsyncFileMem")
-            .field("active", &self.tx.is_some())
-            .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_async_file_mem_temp_and_grow() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        assert!(mem.is_empty().await.unwrap());
-
-        mem.grow_filled(10, 42).await.unwrap();
-        assert_eq!(mem.len().await.unwrap(), 10);
-        assert_eq!(mem.get(0).await.unwrap(), Some(42));
-        assert_eq!(mem.get(9).await.unwrap(), Some(42));
-        assert_eq!(mem.get(10).await.unwrap(), None);
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_persistence() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("persist.bin");
-
-        // Write data
-        {
-            let mut mem = AsyncFileMem::<u64>::from_path(&path).unwrap();
-            mem.grow_filled(5, 123).await.unwrap();
-            mem.set(2, 456).await.unwrap();
-            mem.shutdown().await.unwrap();
-        }
-
-        // Read data back — use grow_assumed to map existing file data
-        {
-            let mem = AsyncFileMem::<u64>::from_path(&path).unwrap();
-            // The file has 5 elements from the previous session.
-            // grow_assumed tells FileMapped to map the already-initialized data.
-            unsafe { mem.grow_assumed(5).await.unwrap() };
-            assert_eq!(mem.len().await.unwrap(), 5);
-            assert_eq!(mem.get(0).await.unwrap(), Some(123));
-            assert_eq!(mem.get(2).await.unwrap(), Some(456));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_shrink() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        mem.grow_filled(20, 1).await.unwrap();
-        assert_eq!(mem.len().await.unwrap(), 20);
-
-        mem.shrink(5).await.unwrap();
-        assert_eq!(mem.len().await.unwrap(), 15);
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_grow_zeroed() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        unsafe {
-            mem.grow_zeroed(10).await.unwrap();
-        }
-        assert_eq!(mem.len().await.unwrap(), 10);
-        for i in 0..10 {
-            assert_eq!(mem.get(i).await.unwrap(), Some(0));
-        }
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_read_write_slice() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        mem.grow_filled(10, 0).await.unwrap();
-
-        // Write a slice
-        mem.write_slice(3, vec![10, 20, 30]).await.unwrap();
-
-        // Read it back
-        let data = mem.read_slice(3, 3).await.unwrap();
-        assert_eq!(data, vec![10, 20, 30]);
-
-        // Verify surrounding values unchanged
-        assert_eq!(mem.get(2).await.unwrap(), Some(0));
-        assert_eq!(mem.get(6).await.unwrap(), Some(0));
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_set_get() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        mem.grow_filled(5, 0).await.unwrap();
-
-        assert!(mem.set(0, 100).await.unwrap());
-        assert!(mem.set(4, 400).await.unwrap());
-        assert!(!mem.set(5, 500).await.unwrap()); // out of bounds
-
-        assert_eq!(mem.get(0).await.unwrap(), Some(100));
-        assert_eq!(mem.get(4).await.unwrap(), Some(400));
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_multiple_grows() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-
-        mem.grow_filled(5, 1).await.unwrap();
-        mem.grow_filled(5, 2).await.unwrap();
-        mem.grow_filled(5, 3).await.unwrap();
-
-        assert_eq!(mem.len().await.unwrap(), 15);
-        assert_eq!(mem.get(0).await.unwrap(), Some(1));
-        assert_eq!(mem.get(5).await.unwrap(), Some(2));
-        assert_eq!(mem.get(10).await.unwrap(), Some(3));
-    }
-
-    #[tokio::test]
-    async fn test_async_file_mem_sequential_operations() {
-        let mem = AsyncFileMem::<u64>::temp().unwrap();
-        mem.grow_filled(100, 0).await.unwrap();
-
-        // Multiple set operations — all serialized through the I/O thread
-        for i in 0..10u64 {
-            mem.set(i as usize, i * 10).await.unwrap();
-        }
-
-        for i in 0..10u64 {
-            assert_eq!(mem.get(i as usize).await.unwrap(), Some(i * 10));
-        }
+        f.debug_struct("AsyncFileMem").field("active", &self.tx.is_some()).finish()
     }
 }

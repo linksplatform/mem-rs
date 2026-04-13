@@ -1,5 +1,5 @@
 use {
-    crate::{raw_place::RawPlace, utils, Error::CapacityOverflow, RawMem, Result},
+    crate::{Error::CapacityOverflow, RawMem, Result, raw_place::RawPlace, utils},
     memmap2::{MmapMut, MmapOptions},
     std::{
         alloc::Layout,
@@ -12,6 +12,14 @@ use {
     },
 };
 
+/// Memory-mapped file storage.
+///
+/// Elements are stored directly in a memory-mapped region backed by a file.
+/// The file is resized and remapped on each [`grow`](RawMem::grow) or
+/// [`shrink`](RawMem::shrink) call. Data is synced to disk on drop.
+///
+/// The file is guaranteed to be at least 4 KiB (one page) to satisfy
+/// OS-level mmap requirements.
 pub struct FileMapped<T> {
     buf: RawPlace<T>,
     mmap: Option<MmapMut>,
@@ -19,7 +27,9 @@ pub struct FileMapped<T> {
 }
 
 impl<T> FileMapped<T> {
-    // todo: say about mapping, read-write guarantees, and `MIN_PAGE_SIZE`
+    /// Creates a `FileMapped` from an already-opened file.
+    ///
+    /// If the file is smaller than one page (4 KiB), it is extended.
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 
@@ -30,8 +40,15 @@ impl<T> FileMapped<T> {
         Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
     }
 
+    /// Opens (or creates) a file at `path` and wraps it in a `FileMapped`.
     pub fn from_path<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        File::options().create(true).read(true).write(true).open(path).and_then(Self::new)
+        File::options()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(path)
+            .and_then(Self::new)
     }
 
     fn map_yet(&mut self, cap: u64) -> io::Result<MmapMut> {
@@ -39,7 +56,7 @@ impl<T> FileMapped<T> {
     }
 
     unsafe fn assume_mapped(&mut self) -> &mut [u8] {
-        self.mmap.as_mut().unwrap_unchecked()
+        unsafe { self.mmap.as_mut().unwrap_unchecked() }
     }
 }
 
@@ -59,17 +76,18 @@ impl<T> RawMem for FileMapped<T> {
         addition: usize,
         fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
     ) -> Result<&mut [T]> {
-        let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
-        // use layout to prevent all capacity bugs
-        let layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
-        let new_size = layout.size() as u64;
+        unsafe {
+            let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
+            // use layout to prevent all capacity bugs
+            let layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
+            let new_size = layout.size() as u64;
 
-        // unmap the file by calling `Drop` of `mmap`
-        let _ = self.mmap.take();
+            // unmap the file by calling `Drop` of `mmap`
+            let _ = self.mmap.take();
 
-        let old_size = self.file.metadata()?.len();
+            let old_size = self.file.metadata()?.len();
 
-        #[rustfmt::skip]
+            #[rustfmt::skip]
         let inited = if old_size < new_size {
             self.file.set_len(new_size)?;
             (old_size as usize / mem::size_of::<T>()) // more flexible without `rustfmt`
@@ -78,14 +96,15 @@ impl<T> RawMem for FileMapped<T> {
             addition // all place is available as initialized
         };
 
-        let ptr = unsafe {
-            let mmap = self.map_yet(new_size)?;
-            self.mmap.replace(mmap);
-            // we set it now: ^^^
-            NonNull::from(self.assume_mapped()) // it assume that `mmap` is some
-        };
+            let ptr = {
+                let mmap = self.map_yet(new_size)?;
+                self.mmap.replace(mmap);
+                // we set it now: ^^^
+                NonNull::from(self.assume_mapped()) // it assume that `mmap` is some
+            };
 
-        Ok(self.buf.handle_fill((ptr.cast(), cap), inited, fill))
+            Ok(self.buf.handle_fill((ptr.cast(), cap), inited, fill))
+        }
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()> {

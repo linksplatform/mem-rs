@@ -33,7 +33,7 @@ Add to your `Cargo.toml`:
 platform-mem = "0.1"
 ```
 
-**Note:** This crate works on stable Rust. It uses the [`allocator-api2`](https://crates.io/crates/allocator-api2) crate to provide allocator API functionality on stable Rust.
+**Note:** This crate uses Rust edition 2024 and works on stable Rust. It uses the [`allocator-api2`](https://crates.io/crates/allocator-api2) crate to provide allocator API functionality on stable Rust.
 
 ### Optional Features
 
@@ -174,6 +174,8 @@ The core trait providing memory operations:
 | `grow_zeroed(cap)` | Grows and zero-initializes (unsafe for non-zeroable types) |
 | `grow_from_slice(src)` | Grows and copies from a slice |
 | `grow_with(addition, f)` | Grows and initializes with a closure |
+| `grow_within(range)` | Grows by cloning a sub-range of existing data |
+| `grow_assumed(cap)` | Grows assuming data is already initialized (unsafe) |
 
 ### Memory Types
 

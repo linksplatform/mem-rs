@@ -1,10 +1,9 @@
 use {
-    allocator_api2::alloc::Allocator,
     crate::{
-        utils,
         Error::{AllocError, CapacityOverflow},
-        RawMem, RawPlace, Result,
+        RawMem, RawPlace, Result, utils,
     },
+    allocator_api2::alloc::Allocator,
     std::{
         alloc::Layout,
         fmt::{self, Debug, Formatter},
@@ -13,6 +12,10 @@ use {
     },
 };
 
+/// Allocator-backed memory storage.
+///
+/// Wraps any [`Allocator`] to provide a [`RawMem`] implementation.
+/// Memory is freed and elements are dropped when the `Alloc` is dropped.
 pub struct Alloc<T, A: Allocator> {
     buf: RawPlace<T>,
     alloc: A,
@@ -47,19 +50,21 @@ impl<T, A: Allocator> RawMem for Alloc<T, A> {
         addition: usize,
         fill: impl FnOnce(usize, (&mut [T], &mut [MaybeUninit<T>])),
     ) -> Result<&mut [T]> {
-        let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
-        let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
+        unsafe {
+            let cap = self.buf.cap().checked_add(addition).ok_or(CapacityOverflow)?;
+            let new_layout = Layout::array::<T>(cap).map_err(|_| CapacityOverflow)?;
 
-        let ptr = if let Some((ptr, old_layout)) = self.buf.current_memory() {
-            self.alloc.grow(ptr, old_layout, new_layout)
-        } else {
-            self.alloc.allocate(new_layout)
+            let ptr = if let Some((ptr, old_layout)) = self.buf.current_memory() {
+                self.alloc.grow(ptr, old_layout, new_layout)
+            } else {
+                self.alloc.allocate(new_layout)
+            }
+            .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
+            .cast();
+
+            // allocator always provide uninit memory
+            Ok(self.buf.handle_fill((ptr, cap), 0, fill))
         }
-        .map_err(|_| AllocError { layout: new_layout, non_exhaustive: () })?
-        .cast();
-
-        // allocator always provide uninit memory
-        Ok(self.buf.handle_fill((ptr, cap), 0, fill))
     }
 
     fn shrink(&mut self, cap: usize) -> Result<()> {
