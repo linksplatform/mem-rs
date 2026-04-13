@@ -107,7 +107,7 @@ fn get_current_version(cargo_toml_path: &str) -> Result<Version, String> {
     let content = fs::read_to_string(cargo_toml_path)
         .map_err(|e| format!("Failed to read {}: {}", cargo_toml_path, e))?;
 
-    let re = Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)""#).unwrap();
+    let re = Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)([^"]*)?""#).unwrap();
 
     if let Some(caps) = re.captures(&content) {
         let major: u32 = caps.get(1).unwrap().as_str().parse().unwrap();

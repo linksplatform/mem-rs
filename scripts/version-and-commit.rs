@@ -117,7 +117,7 @@ struct Version {
 
 impl Version {
     fn parse(content: &str) -> Option<Version> {
-        let re = Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)""#).ok()?;
+        let re = Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)([^"]*)?""#).ok()?;
         let caps = re.captures(content)?;
         Some(Version {
             major: caps.get(1)?.as_str().parse().ok()?,
