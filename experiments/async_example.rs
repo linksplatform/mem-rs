@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let data = persistent.read_slice(0, 5).await?;
         println!("   Wrote: {:?}", data);
         persistent.shutdown().await?;
-        println!("   Synced to disk: {:?}", file_path);
+        println!("   Synced to disk: {}", file_path.display());
     }
 
     // Read data back (mmap sees persisted data via grow_assumed)

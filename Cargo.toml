@@ -2,6 +2,7 @@
 name = "platform-mem"
 version = "0.1.0-pre+beta.2"
 edition = "2024"
+rust-version = "1.85"
 authors = ["uselesssgoddess", "Linksplatform Team <linksplatformtechnologies@gmail.com>"]
 license = "Unlicense"
 repository = "https://github.com/linksplatform/mem-rs"
@@ -9,6 +10,13 @@ homepage = "https://github.com/linksplatform/mem-rs"
 description = """
 Memory for linksplatform
 """
+readme = "README.md"
+keywords = ["memory", "linksplatform", "mmap", "allocator"]
+categories = ["memory-management"]
+
+[lib]
+name = "platform_mem"
+path = "src/lib.rs"
 
 [features]
 default = []
@@ -30,6 +38,45 @@ quickcheck = "1"
 quickcheck_macros = "1"
 criterion = { version = "0.8", features = ["html_reports"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+# Allow some common patterns
+module_name_repetitions = "allow"
+too_many_lines = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+missing_safety_doc = "allow"
+missing_const_for_fn = "allow"
+future_not_send = "allow"
+doc_markdown = "allow"
+must_use_candidate = "allow"
+cast_possible_truncation = "allow"
+unnecessary_box_returns = "allow"
+semicolon_if_nothing_returned = "allow"
+items_after_statements = "allow"
+ptr_as_ptr = "allow"
+borrow_as_ptr = "allow"
+missing_fields_in_debug = "allow"
+uninlined_format_args = "allow"
+incompatible_msrv = "allow"
+explicit_iter_loop = "allow"
+unreadable_literal = "allow"
+wildcard_imports = "allow"
+use_debug = "allow"
+io_other_error = "allow"
+
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
 
 [[example]]
 name = "readme_example1"
