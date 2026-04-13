@@ -113,24 +113,35 @@ struct Version {
     major: u32,
     minor: u32,
     patch: u32,
+    pre_release: bool,
 }
 
 impl Version {
     fn parse(content: &str) -> Option<Version> {
         let re = Regex::new(r#"(?m)^version\s*=\s*"(\d+)\.(\d+)\.(\d+)([^"]*)?""#).ok()?;
         let caps = re.captures(content)?;
+        let suffix = caps.get(4).map_or("", |m| m.as_str());
         Some(Version {
             major: caps.get(1)?.as_str().parse().ok()?,
             minor: caps.get(2)?.as_str().parse().ok()?,
             patch: caps.get(3)?.as_str().parse().ok()?,
+            pre_release: !suffix.is_empty(),
         })
     }
 
     fn bump(&self, bump_type: &str) -> String {
-        match bump_type {
-            "major" => format!("{}.0.0", self.major + 1),
-            "minor" => format!("{}.{}.0", self.major, self.minor + 1),
-            _ => format!("{}.{}.{}", self.major, self.minor, self.patch + 1),
+        if self.pre_release {
+            match bump_type {
+                "major" => format!("{}.0.0", self.major + 1),
+                "minor" => format!("{}.{}.0", self.major, self.minor + 1),
+                _ => format!("{}.{}.{}", self.major, self.minor, self.patch),
+            }
+        } else {
+            match bump_type {
+                "major" => format!("{}.0.0", self.major + 1),
+                "minor" => format!("{}.{}.0", self.major, self.minor + 1),
+                _ => format!("{}.{}.{}", self.major, self.minor, self.patch + 1),
+            }
         }
     }
 }

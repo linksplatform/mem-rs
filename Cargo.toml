@@ -1,6 +1,6 @@
 [package]
 name = "platform-mem"
-version = "0.1.0"
+version = "0.1.0-pre+beta.2"
 edition = "2024"
 rust-version = "1.85"
 authors = ["uselesssgoddess", "Linksplatform Team <linksplatformtechnologies@gmail.com>"]
@@ -71,7 +71,7 @@ unreadable_literal = "allow"
 wildcard_imports = "allow"
 use_debug = "allow"
 io_other_error = "allow"
-match_unit_value = "allow"
+
 
 [profile.release]
 lto = true
