@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["async_mem","raw_mem"],"struct":["Alloc","FileMapped","Global","System","TempFile"]};
+window.SIDEBAR_ITEMS = {"mod":["raw_mem"],"struct":["Alloc","FileMapped","Global","System","TempFile"]};
