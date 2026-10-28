@@ -1,5 +1,5 @@
 (function() {
-    const implementors = Object.fromEntries([["platform_mem",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.94.1/core/fmt/trait.Display.html\" title=\"trait core::fmt::Display\">Display</a> for <a class=\"enum\" href=\"platform_mem/raw_mem/enum.Error.html\" title=\"enum platform_mem::raw_mem::Error\">Error</a>",0]]]]);
+    const implementors = Object.fromEntries([["platform_mem",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.99.1/core/fmt/trait.Display.html\" title=\"trait core::fmt::Display\">Display</a> for <a class=\"enum\" href=\"platform_mem/raw_mem/enum.Error.html\" title=\"enum platform_mem::raw_mem::Error\">Error</a>",0]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
