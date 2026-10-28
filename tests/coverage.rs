@@ -32,13 +32,13 @@ mod alloc_tests {
     #[test]
     fn allocated_returns_empty_slice_initially() {
         let alloc: Alloc<u32, GlobalAlloc> = Alloc::new(GlobalAlloc);
-        assert!(alloc.allocated().is_empty());
+        assert_eq!(alloc.allocated(), []);
     }
 
     #[test]
     fn allocated_mut_returns_empty_slice_initially() {
         let mut alloc: Alloc<u32, GlobalAlloc> = Alloc::new(GlobalAlloc);
-        assert!(alloc.allocated_mut().is_empty());
+        assert_eq!(alloc.allocated_mut(), []);
     }
 
     #[test]

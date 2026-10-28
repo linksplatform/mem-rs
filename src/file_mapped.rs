@@ -20,10 +20,18 @@ use {
 ///
 /// The file is guaranteed to be at least 4 KiB (one page) to satisfy
 /// OS-level mmap requirements.
+///
+/// Growth through [`grow_filled`](RawMem::grow_filled),
+/// [`grow_zeroed`](RawMem::grow_zeroed), or [`grow_with`](RawMem::grow_with)
+/// preserves complete elements present when the file was opened and initializes
+/// only the new tail. Padding added on opening is initialized on first growth.
 pub struct FileMapped<T> {
     buf: RawPlace<T>,
     mmap: Option<MmapMut>,
     pub(crate) file: File,
+    // Existing file data plus successfully initialized growth, excluding fresh
+    // minimum-page padding. This can exceed the currently mapped region.
+    initialized_size: u64,
 }
 
 impl<T> FileMapped<T> {
@@ -33,11 +41,12 @@ impl<T> FileMapped<T> {
     pub fn new(file: File) -> io::Result<Self> {
         const MIN_PAGE_SIZE: u64 = 4096;
 
-        if file.metadata()?.len() < MIN_PAGE_SIZE {
+        let initialized_size = file.metadata()?.len();
+        if initialized_size < MIN_PAGE_SIZE {
             file.set_len(MIN_PAGE_SIZE)?;
         }
 
-        Ok(Self { file, buf: RawPlace::dangling(), mmap: None })
+        Ok(Self { file, buf: RawPlace::dangling(), mmap: None, initialized_size })
     }
 
     /// Opens (or creates) a file at `path` and wraps it in a `FileMapped`.
@@ -87,14 +96,12 @@ impl<T> RawMem for FileMapped<T> {
 
             let old_size = self.file.metadata()?.len();
 
-            #[rustfmt::skip]
-        let inited = if old_size < new_size {
-            self.file.set_len(new_size)?;
-            (old_size as usize / mem::size_of::<T>()) // more flexible without `rustfmt`
-                .unchecked_sub(self.buf.cap())
-        } else {
-            addition // all place is available as initialized
-        };
+            if old_size < new_size {
+                self.file.set_len(new_size)?;
+            }
+            let inited = (self.initialized_size / mem::size_of::<T>() as u64)
+                .saturating_sub(self.buf.cap() as u64)
+                .min(addition as u64) as usize;
 
             let ptr = {
                 let mmap = self.map_yet(new_size)?;
@@ -103,7 +110,9 @@ impl<T> RawMem for FileMapped<T> {
                 NonNull::from(self.assume_mapped()) // it assume that `mmap` is some
             };
 
-            Ok(self.buf.handle_fill((ptr.cast(), cap), inited, fill))
+            let grown = self.buf.handle_fill((ptr.cast(), cap), inited, fill);
+            self.initialized_size = self.initialized_size.max(new_size);
+            Ok(grown)
         }
     }
 
@@ -118,6 +127,7 @@ impl<T> RawMem for FileMapped<T> {
             // then smaller layout will also be valid
             let new_size = mem::size_of::<T>().unchecked_mul(cap) as u64;
             self.file.set_len(new_size)?;
+            self.initialized_size = new_size;
 
             let mmap = self.map_yet(new_size)?;
             self.mmap.replace(mmap);
