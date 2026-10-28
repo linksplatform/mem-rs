@@ -1,5 +1,7 @@
 //! Tests for AsyncFileMem (moved from src/async_mem.rs per project conventions)
 
+#![cfg(feature = "async")]
+
 use platform_mem::AsyncFileMem;
 
 #[tokio::test]
@@ -35,6 +37,35 @@ async fn test_async_file_mem_persistence() {
         assert_eq!(mem.get(0).await.unwrap(), Some(123));
         assert_eq!(mem.get(2).await.unwrap(), Some(456));
     }
+}
+
+#[tokio::test]
+async fn test_async_file_mem_persistence_with_growth_initializers() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("persist-growth.bin");
+    {
+        let mem = AsyncFileMem::<u64>::from_path(&path).unwrap();
+        mem.grow_filled(512, 123).await.unwrap();
+        mem.set(2, 456).await.unwrap();
+        // Exercise drop, which joins the I/O thread and flushes the store.
+    }
+
+    {
+        let mut mem = AsyncFileMem::<u64>::from_path(&path).unwrap();
+        mem.grow_filled(515, 99).await.unwrap();
+        assert_eq!(mem.get(0).await.unwrap(), Some(123));
+        assert_eq!(mem.get(2).await.unwrap(), Some(456));
+        assert_eq!(mem.get(511).await.unwrap(), Some(123));
+        assert_eq!(mem.read_slice(512, 3).await.unwrap(), vec![99; 3]);
+        mem.shutdown().await.unwrap();
+    }
+
+    let mem = AsyncFileMem::<u64>::from_path(&path).unwrap();
+    // SAFETY: u64 permits zero initialization.
+    unsafe { mem.grow_zeroed(518).await.unwrap() };
+    assert_eq!(mem.get(2).await.unwrap(), Some(456));
+    assert_eq!(mem.read_slice(512, 3).await.unwrap(), vec![99; 3]);
+    assert_eq!(mem.read_slice(515, 3).await.unwrap(), vec![0; 3]);
 }
 
 #[tokio::test]

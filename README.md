@@ -79,7 +79,7 @@ fn main() -> Result<(), platform_mem::Error> {
     // Create memory mapped to a file
     let mut mem = FileMapped::<u64>::from_path("data.bin")?;
 
-    // Data persists across program runs
+    // Preserve existing file data and zero only newly allocated elements
     unsafe {
         mem.grow_zeroed(1000)?;
     }
@@ -90,6 +90,15 @@ fn main() -> Result<(), platform_mem::Error> {
     Ok(())
 }
 ```
+
+`grow_filled`, `grow_zeroed`, and `grow_with` preserve complete elements already
+stored in the file, including when it is reopened. They initialize only the new
+tail. Fresh files and padding added when opening a short file receive the
+requested initialization. The file length determines the existing data extent;
+applications should track their logical element count separately.
+
+See the [doublets persistence example](examples/doublets_persistence) for a store
+that writes links, reopens them, and appends more data.
 
 ### Temporary File Storage
 
@@ -170,10 +179,10 @@ The core trait providing memory operations:
 | `allocated_mut()` | Returns a mutable slice of the initialized memory |
 | `grow(addition, fill)` | Grows memory by `addition` elements with custom initialization |
 | `shrink(cap)` | Shrinks memory by `cap` elements |
-| `grow_filled(cap, value)` | Grows and fills with cloned values |
-| `grow_zeroed(cap)` | Grows and zero-initializes (unsafe for non-zeroable types) |
+| `grow_filled(cap, value)` | Grows and fills the uninitialized tail, preserving existing elements |
+| `grow_zeroed(cap)` | Grows and zeroes the uninitialized tail (unsafe for non-zeroable types) |
 | `grow_from_slice(src)` | Grows and copies from a slice |
-| `grow_with(addition, f)` | Grows and initializes with a closure |
+| `grow_with(addition, f)` | Grows and calls a closure for each uninitialized element |
 | `grow_within(range)` | Grows by cloning a sub-range of existing data |
 | `grow_assumed(cap)` | Grows assuming data is already initialized (unsafe) |
 

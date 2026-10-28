@@ -85,10 +85,12 @@ pub trait RawMem {
     /// Low-level growth: extends the memory by `cap` elements.
     ///
     /// The `fill` closure receives `(inited, (initialized_slice, uninitialized_slice))`
-    /// where `inited` is the count of elements already initialized by the backend.
+    /// where `inited` is the length of the already-initialized prefix of
+    /// `uninitialized_slice`, for example elements loaded from an existing file.
+    /// Initializers can preserve that prefix and initialize only the remaining tail.
     ///
     /// # Safety
-    /// Caller must guarantee that `fill` fully initializes the uninitialized portion.
+    /// Caller must guarantee that `fill` fully initializes the portion after `inited`.
     ///
     /// ### Incorrect usage
     /// ```no_run
@@ -146,20 +148,14 @@ pub trait RawMem {
     /// [`grow`]: Self::grow
     /// [`Item`]: Self::Item
     unsafe fn grow_assumed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        unsafe {
-            self.grow(cap, |inited, (_, uninit)| {
-                // fixme: maybe change it to `assert_eq!`
-                debug_assert_eq!(
-                    inited,
-                    uninit.len(),
-                    "grown memory must be initialized, \
-                 usually allocators-like provide uninitialized memory, \
-                 which is only safe for writing"
-                )
-            })
-        }
+        // The caller guarantees validity, including bytes the backend has not
+        // counted as initialized (such as fresh zero-filled file padding).
+        unsafe { self.grow(cap, |_, _| {}) }
     }
 
+    /// Grows by `cap` elements, zeroing only the uninitialized tail.
+    /// Elements already initialized by the backend are preserved.
+    ///
     /// # Safety
     /// [`Item`](Self::Item) must satisfy the [initialization invariant][inv] for
     /// [`core::mem::zeroed`].
@@ -196,31 +192,31 @@ pub trait RawMem {
     ///
     unsafe fn grow_zeroed(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
         unsafe {
-            self.grow(cap, |_, (_, uninit)| {
+            self.grow(cap, |inited, (_, uninit)| {
+                let uninit = &mut uninit[inited..];
                 uninit.as_mut_ptr().write_bytes(0u8, uninit.len());
             })
         }
     }
 
+    /// Equivalent to [`grow_zeroed`](Self::grow_zeroed), preserving initialized elements.
+    ///
     /// # Safety
     /// [`Item`](Self::Item) must satisfy the [initialization invariant](MaybeUninit#initialization-invariant) for zeroed memory.
     unsafe fn grow_zeroed_exact(&mut self, cap: usize) -> Result<&mut [Self::Item]> {
-        unsafe {
-            self.grow(cap, |inited, (_, uninit)| {
-                uninit.get_unchecked_mut(inited..).as_mut_ptr().write_bytes(0u8, uninit.len());
-            })
-        }
+        unsafe { self.grow_zeroed(cap) }
     }
 
-    /// Grows by `addition` elements, initializing each with the closure `f`.
+    /// Grows by `addition` elements, calling `f` only for uninitialized elements.
+    /// Elements already initialized by the backend are preserved.
     fn grow_with(
         &mut self,
         addition: usize,
         f: impl FnMut() -> Self::Item,
     ) -> Result<&mut [Self::Item]> {
         unsafe {
-            self.grow(addition, |_, (_, uninit)| {
-                uninit::fill_with(uninit, f);
+            self.grow(addition, |inited, (_, uninit)| {
+                uninit::fill_with(&mut uninit[inited..], f);
             })
         }
     }
@@ -239,14 +235,15 @@ pub trait RawMem {
         }
     }
 
-    /// Grows by `cap` elements, each cloned from `value`.
+    /// Grows by `cap` elements, initializing the uninitialized tail from `value`.
+    /// Elements already initialized by the backend are preserved.
     fn grow_filled(&mut self, cap: usize, value: Self::Item) -> Result<&mut [Self::Item]>
     where
         Self::Item: Clone,
     {
         unsafe {
-            self.grow(cap, |_, (_, uninit)| {
-                uninit::fill(uninit, value);
+            self.grow(cap, |inited, (_, uninit)| {
+                uninit::fill(&mut uninit[inited..], value);
             })
         }
     }

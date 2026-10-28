@@ -243,12 +243,14 @@ impl<T: Copy + Clone + Send + 'static> AsyncFileMem<T> {
         self.send_command(|tx| Command::WriteSlice(offset, values, tx)).await?
     }
 
-    /// Grows the memory by `count` elements, filling with the given value.
+    /// Grows the memory by `count` elements, filling the uninitialized tail with
+    /// the given value and preserving existing file data.
     pub async fn grow_filled(&self, count: usize, value: T) -> Result<(), Error> {
         self.send_command(|tx| Command::GrowFilled(count, value, tx)).await?
     }
 
-    /// Grows the memory by `count` elements, zero-initialized.
+    /// Grows the memory by `count` elements, zeroing the uninitialized tail and
+    /// preserving existing file data.
     ///
     /// # Safety
     ///
